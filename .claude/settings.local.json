@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npx create-vite@latest /tmp/stocks-tmp --template react-ts)",
+      "Bash(cp -r /tmp/stocks-tmp/. /Users/mithomps/claude-projects/stocks-dashboard/)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(mkdir -p /Users/mithomps/claude-projects/stocks-dashboard/.claude)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill 81834)",
+      "Bash(npm list *)",
+      "Bash(npx vercel *)",
+      "Bash(npx vercel@33 --version)",
+      "Bash(npx vercel@33 deploy --prod --yes)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
