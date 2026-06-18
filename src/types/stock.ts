@@ -1,6 +1,7 @@
 export interface Stock {
   ticker: string
   company: string
+  sector: string
   price: number
   marketCap: string
   ps: number | null

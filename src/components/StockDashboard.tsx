@@ -26,6 +26,30 @@ function SMABadge({ dir }: { dir: 'up' | 'down' }) {
   )
 }
 
+const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
+  'Semiconductors':       { bg: 'rgba(144,205,244,0.15)', fg: '#90cdf4' },
+  'Semiconductor Equip':  { bg: 'rgba(118,169,250,0.15)', fg: '#76a9fa' },
+  'Optical Networking':   { bg: 'rgba(167,243,208,0.15)', fg: '#6ee7b7' },
+  'Cloud Computing':      { bg: 'rgba(196,181,253,0.15)', fg: '#c4b5fd' },
+  'Hardware & Servers':   { bg: 'rgba(253,230,138,0.15)', fg: '#fcd34d' },
+  'Data Center Infra':    { bg: 'rgba(252,165,165,0.15)', fg: '#fca5a5' },
+  'Clean Energy':         { bg: 'rgba(110,231,183,0.15)', fg: '#34d399' },
+  'Nuclear Energy':       { bg: 'rgba(251,191,36,0.15)',  fg: '#f59e0b' },
+  'Energy Infrastructure':{ bg: 'rgba(249,168,212,0.15)', fg: '#f9a8d4' },
+  'Energy Storage':       { bg: 'rgba(134,239,172,0.15)', fg: '#4ade80' },
+  'Crypto Mining':        { bg: 'rgba(253,186,116,0.15)', fg: '#fb923c' },
+  'Enterprise Software':  { bg: 'rgba(165,180,252,0.15)', fg: '#a5b4fc' },
+  'Big Tech':             { bg: 'rgba(103,232,249,0.15)', fg: '#67e8f9' },
+  'EVs & Robotics':       { bg: 'rgba(240,171,252,0.15)', fg: '#e879f9' },
+}
+
+function sectorBg(sector: string): string {
+  return SECTOR_PALETTE[sector]?.bg ?? 'rgba(160,174,192,0.12)'
+}
+function sectorColor(sector: string): string {
+  return SECTOR_PALETTE[sector]?.fg ?? '#a0aec0'
+}
+
 function pctColor(pct: number): string {
   if (pct >= 100) return '#68d391'
   if (pct >= 50) return '#48bb78'
@@ -194,6 +218,7 @@ export function StockDashboard() {
             <tr>
               <Th label="Ticker" sk="ticker" />
               <Th label="Company" />
+              <Th label="Sector" />
               <Th label="Price" sk="price" right />
               <Th label="Mkt Cap" sk="marketCap" right />
               <Th label="P/S" right />
@@ -232,6 +257,18 @@ export function StockDashboard() {
                   {/* Company */}
                   <td style={{ padding: '7px 8px', borderBottom: '1px solid #161b22', whiteSpace: 'nowrap' }}>
                     <span style={{ color: '#a0aec0', fontSize: 12 }}>{s.company}</span>
+                  </td>
+
+                  {/* Sector */}
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #161b22', whiteSpace: 'nowrap' }}>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: '2px 7px',
+                      borderRadius: 4,
+                      background: sectorBg(s.sector),
+                      color: sectorColor(s.sector),
+                    }}>{s.sector}</span>
                   </td>
 
                   {/* Price */}
@@ -327,7 +364,7 @@ export function StockDashboard() {
           </tbody>
           <tfoot>
             <tr style={{ background: '#0d1117', borderTop: '2px solid #2d3748' }}>
-              <td colSpan={3} style={{ padding: '10px 8px', color: '#4a5568', fontSize: 11 }}>
+              <td colSpan={4} style={{ padding: '10px 8px', color: '#4a5568', fontSize: 11 }}>
                 Sum / Avg
               </td>
               <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
