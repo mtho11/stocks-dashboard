@@ -3,7 +3,7 @@ import { stocks as allStocks } from '../data/stocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 
-type SortKey = keyof Pick<Stock, 'ticker' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs'>
+type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs'>
 type SortDir = 'asc' | 'desc'
 
 function SMABadge({ dir }: { dir: 'up' | 'down' }) {
@@ -171,7 +171,7 @@ export function StockDashboard() {
         }}>
           Jensen's 5-Layer AI Cake
         </h1>
-        <p style={{ color: '#4a5568', fontSize: 13 }}>by Lin @speculator_io · June 2, 2026</p>
+        <p style={{ color: '#4a5568', fontSize: 13 }}>by @mtho11 · June 2, 2026</p>
       </div>
 
       {/* Controls */}
@@ -217,8 +217,8 @@ export function StockDashboard() {
           <thead>
             <tr>
               <Th label="Ticker" sk="ticker" />
-              <Th label="Company" />
-              <Th label="Sector" />
+              <Th label="Company" sk="company" />
+              <Th label="Sector" sk="sector" />
               <Th label="Price" sk="price" right />
               <Th label="Mkt Cap" sk="marketCap" right />
               <Th label="P/S" right />
