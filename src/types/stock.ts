@@ -10,7 +10,10 @@ export interface Stock {
   pct1Y: number
   deltaHighs: number
   rsRank: number
-  sma1M: 'up' | 'down'
+  ret1W: number
+  ret1M: number
+  ret3M: number
+  ret6M: number
   sma20: 'up' | 'down'
   sma50: 'up' | 'down'
   sma200: 'up' | 'down'

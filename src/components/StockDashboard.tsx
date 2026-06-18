@@ -3,7 +3,7 @@ import { stocks as allStocks } from '../data/stocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 
-type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs'>
+type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
 type SortDir = 'asc' | 'desc'
 
 function SMABadge({ dir }: { dir: 'up' | 'down' }) {
@@ -228,7 +228,10 @@ export function StockDashboard() {
               <Th label="% 1Y" sk="pct1Y" />
               <Th label="Δ Highs" sk="deltaHighs" />
               <Th label="RS" sk="rsRank" />
-              <Th label="1M" />
+              <Th label="1W %" sk="ret1W" />
+              <Th label="1M %" sk="ret1M" />
+              <Th label="3M %" sk="ret3M" />
+              <Th label="6M %" sk="ret6M" />
               <Th label="20SMA" />
               <Th label="50SMA" />
               <Th label="200SMA" />
@@ -352,8 +355,20 @@ export function StockDashboard() {
                     </span>
                   </td>
 
+                  {/* Period returns */}
+                  {(['ret1W', 'ret1M', 'ret3M', 'ret6M'] as const).map(k => (
+                    <td key={k} style={{ padding: '7px 6px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
+                      <span style={{
+                        fontSize: 11.5, fontWeight: 600,
+                        color: s[k] >= 0 ? '#68d391' : '#fc8181',
+                      }}>
+                        {s[k] >= 0 ? '+' : ''}{s[k].toFixed(1)}%
+                      </span>
+                    </td>
+                  ))}
+
                   {/* SMA badges */}
-                  {(['sma1M', 'sma20', 'sma50', 'sma200'] as const).map(k => (
+                  {(['sma20', 'sma50', 'sma200'] as const).map(k => (
                     <td key={k} style={{ padding: '7px 6px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
                       <SMABadge dir={s[k]} />
                     </td>
@@ -376,7 +391,7 @@ export function StockDashboard() {
               <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
                 {avgPE}
               </td>
-              <td colSpan={9} />
+              <td colSpan={12} />
             </tr>
           </tfoot>
         </table>
