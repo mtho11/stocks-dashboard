@@ -342,10 +342,11 @@ export function StockDashboard() {
       <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #1a202c' }}>
         <table style={{
           width: '100%', borderCollapse: 'collapse',
-          fontSize: 12.5, minWidth: 900,
+          fontSize: 12.5, minWidth: 1000,
         }}>
           <thead>
             <tr>
+              <Th label="#" />
               <Th label="Ticker" sk="ticker" />
               <Th label="Company" sk="company" />
               <Th label="Sector" sk="sector" />
@@ -354,6 +355,7 @@ export function StockDashboard() {
               <Th label="P/S" right />
               <Th label="P/E" right />
               <Th label="% YTD" sk="pctYTD" />
+              <Th label="Chart 1M" />
               <Th label="Chart 1Y" />
               <Th label="% 1Y" sk="pct1Y" />
               <Th label="Δ Highs" sk="deltaHighs" />
@@ -379,6 +381,16 @@ export function StockDashboard() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#1a202c')}
                   onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
+                  {/* Rank */}
+                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
+                    <span style={{
+                      fontWeight: i < 3 ? 700 : 500,
+                      fontSize: 11.5,
+                      fontVariantNumeric: 'tabular-nums',
+                      color: i === 0 ? '#f6ad55' : i === 1 ? '#cbd5e0' : i === 2 ? '#ed8936' : '#4a5568',
+                    }}>{i + 1}</span>
+                  </td>
+
                   {/* Ticker */}
                   <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
                     <span style={{
@@ -448,7 +460,12 @@ export function StockDashboard() {
                     </div>
                   </td>
 
-                  {/* Sparkline */}
+                  {/* Sparkline 1M — recent tail of the series */}
+                  <td style={{ padding: '4px 6px', borderBottom: '1px solid #161b22' }}>
+                    <Sparkline data={s.sparklineData.slice(-8)} width={56} height={26} positive={s.ret1M >= 0} />
+                  </td>
+
+                  {/* Sparkline 1Y */}
                   <td style={{ padding: '4px 6px', borderBottom: '1px solid #161b22' }}>
                     <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos} />
                   </td>
@@ -509,14 +526,14 @@ export function StockDashboard() {
           </tbody>
           <tfoot>
             <tr style={{ background: '#0d1117', borderTop: '2px solid #2d3748' }}>
-              <td colSpan={4} style={{ padding: '10px 8px', color: '#4a5568', fontSize: 11 }}>
+              <td colSpan={5} style={{ padding: '10px 8px', color: '#4a5568', fontSize: 11 }}>
                 Sum / Avg
               </td>
               <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
                 {totalMktCap}
               </td>
               <td colSpan={2} />
-              <td colSpan={12} />
+              <td colSpan={13} />
             </tr>
           </tfoot>
         </table>
