@@ -1,23 +1,17 @@
 import { useState, useMemo } from 'react'
 import { stocks as aiCakeStocks } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
+import { sp500 } from '../data/sp500'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 
-type StockListId = 'ai-cake' | 'nasdaq100'
+type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
 
-const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string; subtitle: string }> = {
-  'ai-cake': {
-    stocks: aiCakeStocks,
-    title: "Jensen's 5-Layer AI Cake",
-    subtitle: 'AI & deep-tech stocks curated by Jensen',
-  },
-  'nasdaq100': {
-    stocks: nasdaq100,
-    title: 'Nasdaq 100',
-    subtitle: 'Top 100 non-financial Nasdaq companies by market cap',
-  },
+const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
+  'ai-cake':  { stocks: aiCakeStocks, title: "Jensen's 5-Layer AI Cake" },
+  'nasdaq100':{ stocks: nasdaq100,    title: 'Nasdaq 100' },
+  'sp500':    { stocks: sp500,        title: 'S&P 500' },
 }
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
@@ -82,6 +76,17 @@ const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
   'Ad Tech':               { bg: 'rgba(232,121,249,0.15)', fg: '#e879f9' },
   'Energy':                { bg: 'rgba(234,179,8,0.15)',   fg: '#eab308' },
   'Utilities':             { bg: 'rgba(74,222,128,0.12)',  fg: '#4ade80' },
+  // S&P 500 extra sectors
+  'Health Services':       { bg: 'rgba(45,212,191,0.15)',  fg: '#2dd4bf' },
+  'Banking':               { bg: 'rgba(96,165,250,0.15)',  fg: '#60a5fa' },
+  'Insurance':             { bg: 'rgba(129,140,248,0.15)', fg: '#818cf8' },
+  'Capital Markets':       { bg: 'rgba(192,132,252,0.15)', fg: '#c084fc' },
+  'Payments':              { bg: 'rgba(34,211,238,0.15)',  fg: '#22d3ee' },
+  'Consumer Disc':         { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },
+  'Consumer Staples':      { bg: 'rgba(163,230,53,0.15)',  fg: '#a3e635' },
+  'Comm Services':         { bg: 'rgba(251,191,36,0.15)',  fg: '#fbbf24' },
+  'Materials':             { bg: 'rgba(161,161,170,0.15)', fg: '#a1a1aa' },
+  'Real Estate':           { bg: 'rgba(52,211,153,0.12)',  fg: '#34d399' },
 }
 
 function sectorBg(sector: string): string {
@@ -269,6 +274,7 @@ export function StockDashboard() {
         >
           <option value="ai-cake">🎂 AI Cake</option>
           <option value="nasdaq100">📊 Nasdaq 100</option>
+          <option value="sp500">📈 S&amp;P 500</option>
         </select>
 
         <input
