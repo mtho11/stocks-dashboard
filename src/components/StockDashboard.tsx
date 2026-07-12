@@ -1,8 +1,24 @@
 import { useState, useMemo } from 'react'
-import { stocks as allStocks } from '../data/stocks'
+import { stocks as aiCakeStocks } from '../data/stocks'
+import { nasdaq100 } from '../data/nasdaq100'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
+
+type StockListId = 'ai-cake' | 'nasdaq100'
+
+const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string; subtitle: string }> = {
+  'ai-cake': {
+    stocks: aiCakeStocks,
+    title: "Jensen's 5-Layer AI Cake",
+    subtitle: 'AI & deep-tech stocks curated by Jensen',
+  },
+  'nasdaq100': {
+    stocks: nasdaq100,
+    title: 'Nasdaq 100',
+    subtitle: 'Top 100 non-financial Nasdaq companies by market cap',
+  },
+}
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
 const MIN_DATE = '2024-01-01'
@@ -37,20 +53,35 @@ function SMABadge({ dir }: { dir: 'up' | 'down' }) {
 }
 
 const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
-  'Semiconductors':       { bg: 'rgba(144,205,244,0.15)', fg: '#90cdf4' },
-  'Semiconductor Equip':  { bg: 'rgba(118,169,250,0.15)', fg: '#76a9fa' },
-  'Optical Networking':   { bg: 'rgba(167,243,208,0.15)', fg: '#6ee7b7' },
-  'Cloud Computing':      { bg: 'rgba(196,181,253,0.15)', fg: '#c4b5fd' },
-  'Hardware & Servers':   { bg: 'rgba(253,230,138,0.15)', fg: '#fcd34d' },
-  'Data Center Infra':    { bg: 'rgba(252,165,165,0.15)', fg: '#fca5a5' },
-  'Clean Energy':         { bg: 'rgba(110,231,183,0.15)', fg: '#34d399' },
-  'Nuclear Energy':       { bg: 'rgba(251,191,36,0.15)',  fg: '#f59e0b' },
-  'Energy Infrastructure':{ bg: 'rgba(249,168,212,0.15)', fg: '#f9a8d4' },
-  'Energy Storage':       { bg: 'rgba(134,239,172,0.15)', fg: '#4ade80' },
-  'Crypto Mining':        { bg: 'rgba(253,186,116,0.15)', fg: '#fb923c' },
-  'Enterprise Software':  { bg: 'rgba(165,180,252,0.15)', fg: '#a5b4fc' },
-  'Big Tech':             { bg: 'rgba(103,232,249,0.15)', fg: '#67e8f9' },
-  'EVs & Robotics':       { bg: 'rgba(240,171,252,0.15)', fg: '#e879f9' },
+  // AI Cake sectors
+  'Semiconductors':        { bg: 'rgba(144,205,244,0.15)', fg: '#90cdf4' },
+  'Semiconductor Equip':   { bg: 'rgba(118,169,250,0.15)', fg: '#76a9fa' },
+  'Optical Networking':    { bg: 'rgba(167,243,208,0.15)', fg: '#6ee7b7' },
+  'Cloud Computing':       { bg: 'rgba(196,181,253,0.15)', fg: '#c4b5fd' },
+  'Hardware & Servers':    { bg: 'rgba(253,230,138,0.15)', fg: '#fcd34d' },
+  'Data Center Infra':     { bg: 'rgba(252,165,165,0.15)', fg: '#fca5a5' },
+  'Clean Energy':          { bg: 'rgba(110,231,183,0.15)', fg: '#34d399' },
+  'Nuclear Energy':        { bg: 'rgba(251,191,36,0.15)',  fg: '#f59e0b' },
+  'Energy Infrastructure': { bg: 'rgba(249,168,212,0.15)', fg: '#f9a8d4' },
+  'Energy Storage':        { bg: 'rgba(134,239,172,0.15)', fg: '#4ade80' },
+  'Crypto Mining':         { bg: 'rgba(253,186,116,0.15)', fg: '#fb923c' },
+  'Enterprise Software':   { bg: 'rgba(165,180,252,0.15)', fg: '#a5b4fc' },
+  'Big Tech':              { bg: 'rgba(103,232,249,0.15)', fg: '#67e8f9' },
+  'EVs & Robotics':        { bg: 'rgba(240,171,252,0.15)', fg: '#e879f9' },
+  // Nasdaq 100 extra sectors
+  'Biotech':               { bg: 'rgba(52,211,153,0.15)',  fg: '#6ee7b7' },
+  'Pharma':                { bg: 'rgba(94,234,212,0.15)',  fg: '#5eead4' },
+  'MedTech':               { bg: 'rgba(167,139,250,0.15)', fg: '#a78bfa' },
+  'Cybersecurity':         { bg: 'rgba(248,113,113,0.15)', fg: '#f87171' },
+  'Consumer':              { bg: 'rgba(251,207,232,0.15)', fg: '#f9a8d4' },
+  'Media & Gaming':        { bg: 'rgba(253,164,175,0.15)', fg: '#fb7185' },
+  'Industrials':           { bg: 'rgba(203,213,225,0.15)', fg: '#94a3b8' },
+  'Travel & Leisure':      { bg: 'rgba(253,224,71,0.15)',  fg: '#facc15' },
+  'Fintech':               { bg: 'rgba(52,211,153,0.18)',  fg: '#34d399' },
+  'E-commerce':            { bg: 'rgba(249,115,22,0.15)',  fg: '#fb923c' },
+  'Ad Tech':               { bg: 'rgba(232,121,249,0.15)', fg: '#e879f9' },
+  'Energy':                { bg: 'rgba(234,179,8,0.15)',   fg: '#eab308' },
+  'Utilities':             { bg: 'rgba(74,222,128,0.12)',  fg: '#4ade80' },
 }
 
 function sectorBg(sector: string): string {
@@ -101,18 +132,22 @@ function fmtPct(n: number): string {
 }
 
 export function StockDashboard() {
+  const [stockListId, setStockListId] = useState<StockListId>('ai-cake')
   const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
   const [selectedDate, setSelectedDate] = useState(REF_STR)
 
+  const activeList = STOCK_LISTS[stockListId]
+  const sourceStocks = activeList.stocks
+
   const isHistorical = selectedDate < REF_STR
 
   const baseStocks = useMemo(() => {
-    if (!isHistorical) return allStocks
-    return getHistoricalStocks(allStocks, new Date(selectedDate + 'T12:00:00Z'))
-  }, [selectedDate, isHistorical])
+    if (!isHistorical) return sourceStocks
+    return getHistoricalStocks(sourceStocks, new Date(selectedDate + 'T12:00:00Z'))
+  }, [selectedDate, isHistorical, sourceStocks])
 
   const sorted = useMemo(() => {
     let list = [...baseStocks]
@@ -194,7 +229,7 @@ export function StockDashboard() {
           backgroundClip: 'text',
           marginBottom: 8,
         }}>
-          Jensen's 5-Layer AI Cake
+          {activeList.title}
         </h1>
         <p style={{ color: '#4a5568', fontSize: 13 }}>
           by @mtho11 · {formatDisplayDate(selectedDate)}
@@ -207,6 +242,35 @@ export function StockDashboard() {
         display: 'flex', gap: 12, marginBottom: 16,
         flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
       }}>
+        {/* List selector */}
+        <select
+          value={stockListId}
+          onChange={e => {
+            setStockListId(e.target.value as StockListId)
+            setSearch('')
+            setFilter('all')
+          }}
+          style={{
+            background: '#161b22',
+            border: '1px solid #2d3748',
+            borderRadius: 8,
+            color: '#e2e8f0',
+            padding: '7px 32px 7px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            outline: 'none',
+            cursor: 'pointer',
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23718096' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 10px center',
+          }}
+        >
+          <option value="ai-cake">🎂 AI Cake</option>
+          <option value="nasdaq100">📊 Nasdaq 100</option>
+        </select>
+
         <input
           type="text"
           placeholder="Search ticker or company…"
