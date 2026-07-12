@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { stocks as aiCakeStocks } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
 import { sp500 } from '../data/sp500'
@@ -16,6 +16,7 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
 const MIN_DATE = '2024-01-01'
+const THEME_KEY = 'stocks-dashboard-theme'
 
 function formatDisplayDate(iso: string) {
   const [y, m, d] = iso.split('-')
@@ -25,6 +26,53 @@ function formatDisplayDate(iso: string) {
 
 type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
 type SortDir = 'asc' | 'desc'
+
+// ── Theme tokens ──────────────────────────────────────────────────────────
+const THEMES = {
+  dark: {
+    pageBg: '#0a0a0f',
+    panelBg: '#0d1117',
+    panelBg2: '#0f1419',
+    hoverBg: '#1a202c',
+    borderOuter: '#1a202c',
+    borderInner: '#161b22',
+    borderControl: '#2d3748',
+    textMuted: '#4a5568',
+    textSecondary: '#718096',
+    textPrimary: '#e2e8f0',
+    inputBg: '#161b22',
+    gradient: 'linear-gradient(135deg, #90cdf4 0%, #68d391 50%, #f6ad55 100%)',
+  },
+  light: {
+    pageBg: '#f3f4f7',
+    panelBg: '#ffffff',
+    panelBg2: '#f8f9fb',
+    hoverBg: '#eef1f6',
+    borderOuter: '#e2e5eb',
+    borderInner: '#edeef2',
+    borderControl: '#d5d9e0',
+    textMuted: '#64748b',
+    textSecondary: '#475569',
+    textPrimary: '#1a202c',
+    inputBg: '#ffffff',
+    gradient: 'linear-gradient(135deg, #2b6cb0 0%, #2f855a 50%, #c05621 100%)',
+  },
+} as const
+
+type ThemeMode = 'dark' | 'light'
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+// Darkens a pastel/light hex color so it reads on a light background.
+function darken(hex: string, amt = 0.42): string {
+  const [r, g, b] = hexToRgb(hex)
+  const f = (v: number) => Math.round(v * (1 - amt)).toString(16).padStart(2, '0')
+  return `#${f(r)}${f(g)}${f(b)}`
+}
 
 function SMABadge({ dir }: { dir: 'up' | 'down' }) {
   return (
@@ -89,13 +137,6 @@ const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
   'Real Estate':           { bg: 'rgba(52,211,153,0.12)',  fg: '#34d399' },
 }
 
-function sectorBg(sector: string): string {
-  return SECTOR_PALETTE[sector]?.bg ?? 'rgba(160,174,192,0.12)'
-}
-function sectorColor(sector: string): string {
-  return SECTOR_PALETTE[sector]?.fg ?? '#a0aec0'
-}
-
 function pctColor(pct: number): string {
   if (pct >= 100) return '#68d391'
   if (pct >= 50) return '#48bb78'
@@ -106,14 +147,15 @@ function pctColor(pct: number): string {
   return '#e53e3e'
 }
 
-function pctBg(pct: number): string {
-  if (pct >= 200) return 'rgba(72,187,120,0.25)'
-  if (pct >= 100) return 'rgba(72,187,120,0.18)'
-  if (pct >= 50) return 'rgba(72,187,120,0.12)'
-  if (pct >= 20) return 'rgba(72,187,120,0.07)'
+function pctBg(pct: number, isDark: boolean): string {
+  const a = isDark ? 1 : 1.6
+  if (pct >= 200) return `rgba(72,187,120,${0.25 * a})`
+  if (pct >= 100) return `rgba(72,187,120,${0.18 * a})`
+  if (pct >= 50) return `rgba(72,187,120,${0.12 * a})`
+  if (pct >= 20) return `rgba(72,187,120,${0.07 * a})`
   if (pct >= 0) return 'transparent'
-  if (pct >= -20) return 'rgba(252,129,129,0.10)'
-  return 'rgba(252,129,129,0.20)'
+  if (pct >= -20) return `rgba(252,129,129,${0.10 * a})`
+  return `rgba(252,129,129,${0.20 * a})`
 }
 
 function ytdBg(pct: number): string {
@@ -136,13 +178,31 @@ function fmtPct(n: number): string {
   return `${sign}${fmt(n)}%`
 }
 
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'dark'
+  const stored = window.localStorage.getItem(THEME_KEY)
+  if (stored === 'dark' || stored === 'light') return stored
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
+
 export function StockDashboard() {
+  const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
   const [stockListId, setStockListId] = useState<StockListId>('ai-cake')
   const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
   const [selectedDate, setSelectedDate] = useState(REF_STR)
+
+  const isDark = mode === 'dark'
+  const t = THEMES[mode]
+
+  useEffect(() => {
+    window.localStorage.setItem(THEME_KEY, mode)
+  }, [mode])
+
+  // Darkens light/pastel accent colors so they stay legible on a light page.
+  const ink = useCallback((hex: string) => (isDark ? hex : darken(hex)), [isDark])
 
   const activeList = STOCK_LISTS[stockListId]
   const sourceStocks = activeList.stocks
@@ -201,14 +261,14 @@ export function StockDashboard() {
           textAlign: right ? 'right' : 'center',
           whiteSpace: 'nowrap',
           cursor: sk ? 'pointer' : 'default',
-          color: active ? '#90cdf4' : '#718096',
+          color: active ? ink('#90cdf4') : t.textSecondary,
           fontWeight: 600,
           fontSize: 11,
           letterSpacing: '0.05em',
           textTransform: 'uppercase',
           userSelect: 'none',
-          borderBottom: '1px solid #2d3748',
-          background: '#0d1117',
+          borderBottom: `1px solid ${t.borderControl}`,
+          background: t.panelBg,
           position: 'sticky', top: 0, zIndex: 2,
         }}
       >
@@ -221,22 +281,38 @@ export function StockDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', padding: '24px 16px' }}>
+    <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+      <div style={{ position: 'relative', textAlign: 'center', marginBottom: 28 }}>
+        <button
+          onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
+          aria-label="Toggle light/dark theme"
+          style={{
+            position: 'absolute', top: 0, right: 0,
+            width: 36, height: 36, borderRadius: 10,
+            border: `1px solid ${t.borderControl}`,
+            background: t.inputBg,
+            color: t.textSecondary,
+            cursor: 'pointer', fontSize: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {isDark ? '☀️' : '🌙'}
+        </button>
         <h1 style={{
           fontSize: 'clamp(22px, 4vw, 38px)',
           fontWeight: 800,
           letterSpacing: '-0.02em',
-          background: 'linear-gradient(135deg, #90cdf4 0%, #68d391 50%, #f6ad55 100%)',
+          backgroundImage: t.gradient,
           WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          color: 'transparent',
           marginBottom: 8,
         }}>
           {activeList.title}
         </h1>
-        <p style={{ color: '#4a5568', fontSize: 13 }}>
+        <p style={{ color: t.textMuted, fontSize: 13 }}>
           by @mtho11 · {formatDisplayDate(selectedDate)}
           {isHistorical && <span style={{ marginLeft: 8, color: '#f6ad55', fontWeight: 600 }}>· historical</span>}
         </p>
@@ -256,10 +332,10 @@ export function StockDashboard() {
             setFilter('all')
           }}
           style={{
-            background: '#161b22',
-            border: '1px solid #2d3748',
+            backgroundColor: t.inputBg,
+            border: `1px solid ${t.borderControl}`,
             borderRadius: 8,
-            color: '#e2e8f0',
+            color: t.textPrimary,
             padding: '7px 32px 7px 12px',
             fontSize: 12,
             fontWeight: 600,
@@ -283,8 +359,8 @@ export function StockDashboard() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{
-            background: '#161b22', border: '1px solid #2d3748', borderRadius: 8,
-            color: '#e2e8f0', padding: '8px 14px', fontSize: 13, width: 220,
+            background: t.inputBg, border: `1px solid ${t.borderControl}`, borderRadius: 8,
+            color: t.textPrimary, padding: '8px 14px', fontSize: 13, width: 220,
             outline: 'none',
           }}
         />
@@ -293,20 +369,20 @@ export function StockDashboard() {
             padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
             cursor: 'pointer', border: 'none', letterSpacing: '0.04em',
             background: filter === f
-              ? (f === 'positive' ? '#276749' : f === 'negative' ? '#742a2a' : '#2d3748')
-              : '#161b22',
-            color: filter === f ? '#e2e8f0' : '#718096',
+              ? (f === 'positive' ? '#276749' : f === 'negative' ? '#742a2a' : t.borderControl)
+              : t.inputBg,
+            color: filter === f ? '#e2e8f0' : t.textSecondary,
             transition: 'all 0.15s',
           }}>
             {f === 'all' ? 'All' : f === 'positive' ? '▲ Winners' : '▼ Losers'}
           </button>
         ))}
-        <span style={{ color: '#4a5568', fontSize: 12, marginLeft: 4 }}>
+        <span style={{ color: t.textMuted, fontSize: 12, marginLeft: 4 }}>
           {sorted.length} stocks
         </span>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-          <label style={{ color: '#718096', fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
+          <label style={{ color: t.textSecondary, fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
             Date
           </label>
           <input
@@ -316,9 +392,9 @@ export function StockDashboard() {
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
             style={{
-              background: isHistorical ? 'rgba(246,173,85,0.1)' : '#161b22',
-              border: `1px solid ${isHistorical ? '#744210' : '#2d3748'}`,
-              borderRadius: 8, color: isHistorical ? '#f6ad55' : '#e2e8f0',
+              background: isHistorical ? 'rgba(246,173,85,0.1)' : t.inputBg,
+              border: `1px solid ${isHistorical ? '#744210' : t.borderControl}`,
+              borderRadius: 8, color: isHistorical ? '#dd6b20' : t.textPrimary,
               padding: '7px 10px', fontSize: 12, outline: 'none', cursor: 'pointer',
             }}
           />
@@ -328,7 +404,7 @@ export function StockDashboard() {
               style={{
                 padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', border: '1px solid #744210',
-                background: 'rgba(246,173,85,0.15)', color: '#f6ad55',
+                background: 'rgba(246,173,85,0.15)', color: '#dd6b20',
                 letterSpacing: '0.04em',
               }}
             >
@@ -339,7 +415,7 @@ export function StockDashboard() {
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #1a202c' }}>
+      <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${t.borderOuter}` }}>
         <table style={{
           width: '100%', borderCollapse: 'collapse',
           fontSize: 12.5, minWidth: 1000,
@@ -372,81 +448,82 @@ export function StockDashboard() {
           <tbody>
             {sorted.map((s, i) => {
               const isPos = s.pctYTD >= 0
-              const rowBg = i % 2 === 0 ? '#0d1117' : '#0f1419'
+              const rowBg = i % 2 === 0 ? t.panelBg : t.panelBg2
+              const cellBorder = `1px solid ${t.borderInner}`
               return (
                 <tr key={s.ticker} style={{
                   background: rowBg,
                   transition: 'background 0.1s',
                 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#1a202c')}
+                  onMouseEnter={e => (e.currentTarget.style.background = t.hoverBg)}
                   onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
                   {/* Rank */}
-                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
                       fontWeight: i < 3 ? 700 : 500,
                       fontSize: 11.5,
                       fontVariantNumeric: 'tabular-nums',
-                      color: i === 0 ? '#f6ad55' : i === 1 ? '#cbd5e0' : i === 2 ? '#ed8936' : '#4a5568',
+                      color: i === 0 ? '#dd6b20' : i === 1 ? t.textSecondary : i === 2 ? '#c05621' : t.textMuted,
                     }}>{i + 1}</span>
                   </td>
 
                   {/* Ticker */}
-                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
                       fontWeight: 700, fontSize: 11.5,
-                      color: '#90cdf4', letterSpacing: '0.03em',
+                      color: ink('#90cdf4'), letterSpacing: '0.03em',
                     }}>{s.ticker}</span>
                   </td>
 
                   {/* Company */}
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #161b22', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: '#a0aec0', fontSize: 12 }}>{s.company}</span>
+                  <td style={{ padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
+                    <span style={{ color: t.textSecondary, fontSize: 12 }}>{s.company}</span>
                   </td>
 
                   {/* Sector */}
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid #161b22', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
                     <span style={{
                       fontSize: 11,
                       fontWeight: 500,
                       padding: '2px 7px',
                       borderRadius: 4,
-                      background: sectorBg(s.sector),
-                      color: sectorColor(s.sector),
+                      background: SECTOR_PALETTE[s.sector]?.bg ?? 'rgba(160,174,192,0.12)',
+                      color: ink(SECTOR_PALETTE[s.sector]?.fg ?? '#a0aec0'),
                     }}>{s.sector}</span>
                   </td>
 
                   {/* Price */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
-                    <span style={{ fontWeight: 600, color: '#e2e8f0' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <span style={{ fontWeight: 600, color: t.textPrimary }}>
                       ${fmt(s.price)}
                     </span>
                   </td>
 
                   {/* Market Cap */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
-                    <span style={{ color: '#718096' }}>{s.marketCap}</span>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <span style={{ color: t.textSecondary }}>{s.marketCap}</span>
                   </td>
 
                   {/* P/S */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
-                      color: s.ps !== null && s.ps > 100 ? '#f6ad55' : '#a0aec0',
+                      color: s.ps !== null && s.ps > 100 ? '#dd6b20' : t.textSecondary,
                       fontWeight: s.ps !== null && s.ps > 100 ? 700 : 400,
                     }}>
-                      {s.ps !== null ? fmt(s.ps) : <span style={{ color: '#4a5568' }}>n/a</span>}
+                      {s.ps !== null ? fmt(s.ps) : <span style={{ color: t.textMuted }}>n/a</span>}
                     </span>
                   </td>
 
                   {/* P/E */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
-                    <span style={{ color: '#a0aec0' }}>
-                      {s.pe !== null ? fmt(s.pe) : <span style={{ color: '#4a5568' }}>n/a</span>}
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <span style={{ color: t.textSecondary }}>
+                      {s.pe !== null ? fmt(s.pe) : <span style={{ color: t.textMuted }}>n/a</span>}
                     </span>
                   </td>
 
                   {/* % YTD */}
-                  <td style={{ padding: '7px 6px', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 6px', borderBottom: cellBorder }}>
                     <div style={{
                       display: 'inline-block',
                       background: ytdBg(s.pctYTD),
@@ -461,20 +538,20 @@ export function StockDashboard() {
                   </td>
 
                   {/* Sparkline 1M — recent tail of the series */}
-                  <td style={{ padding: '4px 6px', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
                     <Sparkline data={s.sparklineData.slice(-8)} width={56} height={26} positive={s.ret1M >= 0} />
                   </td>
 
                   {/* Sparkline 1Y */}
-                  <td style={{ padding: '4px 6px', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
                     <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos} />
                   </td>
 
                   {/* % 1Y */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
-                      color: pctColor(s.pct1Y),
-                      background: pctBg(s.pct1Y),
+                      color: ink(pctColor(s.pct1Y)),
+                      background: pctBg(s.pct1Y, isDark),
                       padding: '2px 6px', borderRadius: 4,
                       fontWeight: 600,
                     }}>
@@ -483,18 +560,18 @@ export function StockDashboard() {
                   </td>
 
                   {/* Delta Highs */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
-                    <span style={{ color: s.deltaHighs >= -5 ? '#68d391' : s.deltaHighs >= -15 ? '#f6ad55' : '#fc8181', fontWeight: 600 }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <span style={{ color: s.deltaHighs >= -5 ? '#38a169' : s.deltaHighs >= -15 ? '#dd6b20' : '#e53e3e', fontWeight: 600 }}>
                       {fmt(s.deltaHighs)}%
                     </span>
                   </td>
 
                   {/* RS Rank */}
-                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
                       display: 'inline-block',
                       background: s.rsRank >= 90 ? 'rgba(72,187,120,0.2)' : s.rsRank >= 70 ? 'rgba(246,173,85,0.15)' : 'rgba(252,129,129,0.15)',
-                      color: s.rsRank >= 90 ? '#68d391' : s.rsRank >= 70 ? '#f6ad55' : '#fc8181',
+                      color: s.rsRank >= 90 ? '#2f855a' : s.rsRank >= 70 ? '#c05621' : '#c53030',
                       fontWeight: 700, fontSize: 11.5,
                       borderRadius: 4, padding: '2px 7px',
                     }}>
@@ -504,10 +581,10 @@ export function StockDashboard() {
 
                   {/* Period returns */}
                   {(['ret1W', 'ret1M', 'ret3M', 'ret6M'] as const).map(k => (
-                    <td key={k} style={{ padding: '7px 6px', textAlign: 'right', borderBottom: '1px solid #161b22' }}>
+                    <td key={k} style={{ padding: '7px 6px', textAlign: 'right', borderBottom: cellBorder }}>
                       <span style={{
                         fontSize: 11.5, fontWeight: 600,
-                        color: s[k] >= 0 ? '#68d391' : '#fc8181',
+                        color: s[k] >= 0 ? '#38a169' : '#e53e3e',
                       }}>
                         {s[k] >= 0 ? '+' : ''}{s[k].toFixed(1)}%
                       </span>
@@ -516,7 +593,7 @@ export function StockDashboard() {
 
                   {/* SMA badges */}
                   {(['sma20', 'sma50', 'sma200'] as const).map(k => (
-                    <td key={k} style={{ padding: '7px 6px', textAlign: 'center', borderBottom: '1px solid #161b22' }}>
+                    <td key={k} style={{ padding: '7px 6px', textAlign: 'center', borderBottom: cellBorder }}>
                       <SMABadge dir={s[k]} />
                     </td>
                   ))}
@@ -525,11 +602,11 @@ export function StockDashboard() {
             })}
           </tbody>
           <tfoot>
-            <tr style={{ background: '#0d1117', borderTop: '2px solid #2d3748' }}>
-              <td colSpan={5} style={{ padding: '10px 8px', color: '#4a5568', fontSize: 11 }}>
+            <tr style={{ background: t.panelBg, borderTop: `2px solid ${t.borderControl}` }}>
+              <td colSpan={5} style={{ padding: '10px 8px', color: t.textMuted, fontSize: 11 }}>
                 Sum / Avg
               </td>
-              <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
+              <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, fontWeight: 700, fontSize: 12 }}>
                 {totalMktCap}
               </td>
               <td colSpan={2} />
@@ -546,24 +623,24 @@ export function StockDashboard() {
         gap: 12, marginTop: 20,
       }}>
         {[
-          { label: 'Total Market Cap', value: totalMktCap, color: '#90cdf4' },
-          { label: 'Stocks Listed', value: String(baseStocks.length), color: '#b794f4' },
+          { label: 'Total Market Cap', value: totalMktCap, color: ink('#90cdf4') },
+          { label: 'Stocks Listed', value: String(baseStocks.length), color: ink('#b794f4') },
           {
             label: 'YTD Winners',
             value: String(baseStocks.filter(s => s.pctYTD >= 0).length),
-            color: '#68d391',
+            color: '#38a169',
           },
           {
             label: 'YTD Losers',
             value: String(baseStocks.filter(s => s.pctYTD < 0).length),
-            color: '#fc8181',
+            color: '#e53e3e',
           },
         ].map(c => (
           <div key={c.label} style={{
-            background: '#0d1117', border: '1px solid #1a202c',
+            background: t.panelBg, border: `1px solid ${t.borderOuter}`,
             borderRadius: 10, padding: '14px 18px',
           }}>
-            <div style={{ color: '#4a5568', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
+            <div style={{ color: t.textMuted, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
               {c.label}
             </div>
             <div style={{ color: c.color, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>
