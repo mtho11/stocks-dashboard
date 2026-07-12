@@ -2,6 +2,16 @@ import { useState, useMemo } from 'react'
 import { stocks as allStocks } from '../data/stocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
+import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
+
+const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
+const MIN_DATE = '2024-01-01'
+
+function formatDisplayDate(iso: string) {
+  const [y, m, d] = iso.split('-')
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`
+}
 
 type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
 type SortDir = 'asc' | 'desc'
@@ -95,9 +105,17 @@ export function StockDashboard() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
+  const [selectedDate, setSelectedDate] = useState(REF_STR)
+
+  const isHistorical = selectedDate < REF_STR
+
+  const baseStocks = useMemo(() => {
+    if (!isHistorical) return allStocks
+    return getHistoricalStocks(allStocks, new Date(selectedDate + 'T12:00:00Z'))
+  }, [selectedDate, isHistorical])
 
   const sorted = useMemo(() => {
-    let list = [...allStocks]
+    let list = [...baseStocks]
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(s => s.ticker.toLowerCase().includes(q) || s.company.toLowerCase().includes(q))
@@ -115,16 +133,23 @@ export function StockDashboard() {
       return 0
     })
     return list
-  }, [sortKey, sortDir, search, filter])
+  }, [sortKey, sortDir, search, filter, baseStocks])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
   }
 
-  const totalMktCap = '$25.7T'
-  const avgPS = '29.26'
-  const avgPE = '112.92'
+  const totalMktCap = useMemo(() => {
+    const total = baseStocks.reduce((sum, s) => {
+      const m = s.marketCap.match(/^\$([0-9.]+)([KMBT])$/)
+      if (!m) return sum
+      const mults: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }
+      return sum + parseFloat(m[1]) * mults[m[2]]
+    }, 0)
+    if (total >= 1e12) return `$${(total / 1e12).toFixed(1)}T`
+    return `$${(total / 1e9).toFixed(0)}B`
+  }, [baseStocks])
 
   function Th({ label, sk, right }: { label: string; sk?: SortKey; right?: boolean }) {
     const active = sk && sortKey === sk
@@ -171,7 +196,10 @@ export function StockDashboard() {
         }}>
           Jensen's 5-Layer AI Cake
         </h1>
-        <p style={{ color: '#4a5568', fontSize: 13 }}>by @mtho11 · June 2, 2026</p>
+        <p style={{ color: '#4a5568', fontSize: 13 }}>
+          by @mtho11 · {formatDisplayDate(selectedDate)}
+          {isHistorical && <span style={{ marginLeft: 8, color: '#f6ad55', fontWeight: 600 }}>· historical</span>}
+        </p>
       </div>
 
       {/* Controls */}
@@ -206,6 +234,38 @@ export function StockDashboard() {
         <span style={{ color: '#4a5568', fontSize: 12, marginLeft: 4 }}>
           {sorted.length} stocks
         </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+          <label style={{ color: '#718096', fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
+            Date
+          </label>
+          <input
+            type="date"
+            min={MIN_DATE}
+            max={REF_STR}
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+            style={{
+              background: isHistorical ? 'rgba(246,173,85,0.1)' : '#161b22',
+              border: `1px solid ${isHistorical ? '#744210' : '#2d3748'}`,
+              borderRadius: 8, color: isHistorical ? '#f6ad55' : '#e2e8f0',
+              padding: '7px 10px', fontSize: 12, outline: 'none', cursor: 'pointer',
+            }}
+          />
+          {isHistorical && (
+            <button
+              onClick={() => setSelectedDate(REF_STR)}
+              style={{
+                padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', border: '1px solid #744210',
+                background: 'rgba(246,173,85,0.15)', color: '#f6ad55',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -385,12 +445,7 @@ export function StockDashboard() {
               <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
                 {totalMktCap}
               </td>
-              <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
-                {avgPS}
-              </td>
-              <td style={{ padding: '10px 8px', textAlign: 'right', color: '#718096', fontWeight: 700, fontSize: 12 }}>
-                {avgPE}
-              </td>
+              <td colSpan={2} />
               <td colSpan={12} />
             </tr>
           </tfoot>
@@ -405,17 +460,15 @@ export function StockDashboard() {
       }}>
         {[
           { label: 'Total Market Cap', value: totalMktCap, color: '#90cdf4' },
-          { label: 'Avg P/S', value: avgPS, color: '#68d391' },
-          { label: 'Avg P/E', value: avgPE, color: '#f6ad55' },
-          { label: 'Stocks Listed', value: String(allStocks.length), color: '#b794f4' },
+          { label: 'Stocks Listed', value: String(baseStocks.length), color: '#b794f4' },
           {
             label: 'YTD Winners',
-            value: String(allStocks.filter(s => s.pctYTD >= 0).length),
+            value: String(baseStocks.filter(s => s.pctYTD >= 0).length),
             color: '#68d391',
           },
           {
             label: 'YTD Losers',
-            value: String(allStocks.filter(s => s.pctYTD < 0).length),
+            value: String(baseStocks.filter(s => s.pctYTD < 0).length),
             color: '#fc8181',
           },
         ].map(c => (
