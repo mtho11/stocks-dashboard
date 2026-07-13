@@ -1,13 +1,5 @@
 import type { Stock } from '../types/stock'
-
-function spark(base: number, vol: number, trend: number, pts = 30): number[] {
-  const d: number[] = [base]
-  for (let i = 1; i < pts; i++) {
-    const p = d[i - 1]
-    d.push(Math.max(0.01, p + p * (trend / pts + (Math.random() - 0.48) * vol)))
-  }
-  return d
-}
+import { spark } from './spark'
 
 export const nasdaq100: Stock[] = [
   // ── Mega-cap tech ──────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { sp500 } from '../data/sp500'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
+import { parseMarketCap } from '../utils/marketCap'
 
 type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
 
@@ -60,6 +61,47 @@ const THEMES = {
 } as const
 
 type ThemeMode = 'dark' | 'light'
+type Theme = (typeof THEMES)[ThemeMode]
+
+// Top-level so its component identity is stable across renders — defining
+// it inside StockDashboard remounted every header cell on each render.
+function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
+  label: string
+  sk?: SortKey
+  right?: boolean
+  sortKey: SortKey
+  sortDir: SortDir
+  onSort: (key: SortKey) => void
+  t: Theme
+  ink: (hex: string) => string
+}) {
+  const active = sk && sortKey === sk
+  return (
+    <th
+      onClick={sk ? () => onSort(sk) : undefined}
+      style={{
+        padding: '10px 8px',
+        textAlign: right ? 'right' : 'center',
+        whiteSpace: 'nowrap',
+        cursor: sk ? 'pointer' : 'default',
+        color: active ? ink('#90cdf4') : t.textSecondary,
+        fontWeight: 600,
+        fontSize: 11,
+        letterSpacing: '0.05em',
+        textTransform: 'uppercase',
+        userSelect: 'none',
+        borderBottom: `1px solid ${t.borderControl}`,
+        background: t.panelBg,
+        position: 'sticky', top: 0, zIndex: 2,
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        {label}
+        {sk && <span style={{ opacity: active ? 1 : 0.3, fontSize: 9 }}>{active && sortDir === 'asc' ? '▲' : '▼'}</span>}
+      </span>
+    </th>
+  )
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
@@ -199,6 +241,10 @@ export function StockDashboard() {
 
   useEffect(() => {
     window.localStorage.setItem(THEME_KEY, mode)
+    // Sync the page chrome: index.css hardcodes a dark body, which
+    // otherwise shows through as dark overscroll/scrollbars in light mode.
+    document.body.style.background = THEMES[mode].pageBg
+    document.documentElement.style.colorScheme = mode
   }, [mode])
 
   // Darkens light/pastel accent colors so they stay legible on a light page.
@@ -206,6 +252,10 @@ export function StockDashboard() {
 
   const activeList = STOCK_LISTS[stockListId]
   const sourceStocks = activeList.stocks
+
+  useEffect(() => {
+    document.title = activeList.title
+  }, [activeList.title])
 
   const isHistorical = selectedDate < REF_STR
 
@@ -224,10 +274,10 @@ export function StockDashboard() {
     if (filter === 'negative') list = list.filter(s => s.pctYTD < 0)
 
     list.sort((a, b) => {
-      const av = a[sortKey] as number | string
-      const bv = b[sortKey] as number | string
-      if (av === null) return 1
-      if (bv === null) return -1
+      // Market cap is a display string ("$254.2B") — compare numerically,
+      // otherwise it sorts alphabetically ($850.4B above $5.4T).
+      const av = sortKey === 'marketCap' ? parseMarketCap(a.marketCap) : a[sortKey]
+      const bv = sortKey === 'marketCap' ? parseMarketCap(b.marketCap) : b[sortKey]
       if (av < bv) return sortDir === 'asc' ? -1 : 1
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
@@ -241,44 +291,12 @@ export function StockDashboard() {
   }
 
   const totalMktCap = useMemo(() => {
-    const total = baseStocks.reduce((sum, s) => {
-      const m = s.marketCap.match(/^\$([0-9.]+)([KMBT])$/)
-      if (!m) return sum
-      const mults: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }
-      return sum + parseFloat(m[1]) * mults[m[2]]
-    }, 0)
+    const total = baseStocks.reduce((sum, s) => sum + parseMarketCap(s.marketCap), 0)
     if (total >= 1e12) return `$${(total / 1e12).toFixed(1)}T`
     return `$${(total / 1e9).toFixed(0)}B`
   }, [baseStocks])
 
-  function Th({ label, sk, right }: { label: string; sk?: SortKey; right?: boolean }) {
-    const active = sk && sortKey === sk
-    return (
-      <th
-        onClick={sk ? () => toggleSort(sk) : undefined}
-        style={{
-          padding: '10px 8px',
-          textAlign: right ? 'right' : 'center',
-          whiteSpace: 'nowrap',
-          cursor: sk ? 'pointer' : 'default',
-          color: active ? ink('#90cdf4') : t.textSecondary,
-          fontWeight: 600,
-          fontSize: 11,
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase',
-          userSelect: 'none',
-          borderBottom: `1px solid ${t.borderControl}`,
-          background: t.panelBg,
-          position: 'sticky', top: 0, zIndex: 2,
-        }}
-      >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-          {label}
-          {sk && <span style={{ opacity: active ? 1 : 0.3, fontSize: 9 }}>{active && sortDir === 'asc' ? '▲' : '▼'}</span>}
-        </span>
-      </th>
-    )
-  }
+  const thProps = { sortKey, sortDir, onSort: toggleSort, t, ink }
 
   return (
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
@@ -422,27 +440,27 @@ export function StockDashboard() {
         }}>
           <thead>
             <tr>
-              <Th label="#" />
-              <Th label="Ticker" sk="ticker" />
-              <Th label="Company" sk="company" />
-              <Th label="Sector" sk="sector" />
-              <Th label="Price" sk="price" right />
-              <Th label="Mkt Cap" sk="marketCap" right />
-              <Th label="P/S" right />
-              <Th label="P/E" right />
-              <Th label="% YTD" sk="pctYTD" />
-              <Th label="Chart 1M" />
-              <Th label="Chart 1Y" />
-              <Th label="% 1Y" sk="pct1Y" />
-              <Th label="Δ Highs" sk="deltaHighs" />
-              <Th label="RS" sk="rsRank" />
-              <Th label="1W %" sk="ret1W" />
-              <Th label="1M %" sk="ret1M" />
-              <Th label="3M %" sk="ret3M" />
-              <Th label="6M %" sk="ret6M" />
-              <Th label="20SMA" />
-              <Th label="50SMA" />
-              <Th label="200SMA" />
+              <Th label="#" {...thProps} />
+              <Th label="Ticker" sk="ticker" {...thProps} />
+              <Th label="Company" sk="company" {...thProps} />
+              <Th label="Sector" sk="sector" {...thProps} />
+              <Th label="Price" sk="price" right {...thProps} />
+              <Th label="Mkt Cap" sk="marketCap" right {...thProps} />
+              <Th label="P/S" right {...thProps} />
+              <Th label="P/E" right {...thProps} />
+              <Th label="% YTD" sk="pctYTD" {...thProps} />
+              <Th label="Chart 1M" {...thProps} />
+              <Th label="Chart 1Y" {...thProps} />
+              <Th label="% 1Y" sk="pct1Y" {...thProps} />
+              <Th label="Δ Highs" sk="deltaHighs" {...thProps} />
+              <Th label="RS" sk="rsRank" {...thProps} />
+              <Th label="1W %" sk="ret1W" {...thProps} />
+              <Th label="1M %" sk="ret1M" {...thProps} />
+              <Th label="3M %" sk="ret3M" {...thProps} />
+              <Th label="6M %" sk="ret6M" {...thProps} />
+              <Th label="20SMA" {...thProps} />
+              <Th label="50SMA" {...thProps} />
+              <Th label="200SMA" {...thProps} />
             </tr>
           </thead>
           <tbody>

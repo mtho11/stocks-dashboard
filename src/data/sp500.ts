@@ -1,13 +1,5 @@
 import type { Stock } from '../types/stock'
-
-function spark(base: number, vol: number, trend: number, pts = 30): number[] {
-  const d: number[] = [base]
-  for (let i = 1; i < pts; i++) {
-    const p = d[i - 1]
-    d.push(Math.max(0.01, p + p * (trend / pts + (Math.random() - 0.48) * vol)))
-  }
-  return d
-}
+import { spark, rand } from './spark'
 
 function s(
   ticker: string, company: string, sector: string,
@@ -16,11 +8,11 @@ function s(
   ps: number | null, pe: number | null
 ): Stock {
   const ann = y1 / 100
-  const r1w = ((Math.pow(1 + ann, 7 / 365) - 1) + (Math.random() - 0.48) * 0.025) * 100
-  const r1m = ((Math.pow(1 + ann, 30 / 365) - 1) + (Math.random() - 0.48) * 0.04) * 100
-  const r3m = ((Math.pow(1 + ann, 91 / 365) - 1) + (Math.random() - 0.48) * 0.07) * 100
-  const r6m = ((Math.pow(1 + ann, 182 / 365) - 1) + (Math.random() - 0.48) * 0.10) * 100
-  const dh = ytd >= 0 ? -(Math.random() * 14) : -(15 + Math.random() * 25)
+  const r1w = ((Math.pow(1 + ann, 7 / 365) - 1) + (rand() - 0.48) * 0.025) * 100
+  const r1m = ((Math.pow(1 + ann, 30 / 365) - 1) + (rand() - 0.48) * 0.04) * 100
+  const r3m = ((Math.pow(1 + ann, 91 / 365) - 1) + (rand() - 0.48) * 0.07) * 100
+  const r6m = ((Math.pow(1 + ann, 182 / 365) - 1) + (rand() - 0.48) * 0.10) * 100
+  const dh = ytd >= 0 ? -(rand() * 14) : -(15 + rand() * 25)
   const vol2 = Math.abs(ytd) > 30 ? 0.09 : 0.06
   return {
     ticker, company, sector, price, marketCap: mcap, ps, pe,
@@ -32,7 +24,7 @@ function s(
     sma20: r1m > 0 ? 'up' : 'down',
     sma50: r3m > 0 ? 'up' : 'down',
     sma200: r6m > 0 ? 'up' : 'down',
-    sparklineData: spark(price * (0.65 + Math.random() * 0.15), vol2, ytd >= 0 ? 0.4 : -0.3),
+    sparklineData: spark(price * (0.65 + rand() * 0.15), vol2, ytd >= 0 ? 0.4 : -0.3),
   }
 }
 

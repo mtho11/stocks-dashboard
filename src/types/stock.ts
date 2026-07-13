@@ -18,5 +18,4 @@ export interface Stock {
   sma50: 'up' | 'down'
   sma200: 'up' | 'down'
   sparklineData: number[]
-  color?: string
 }

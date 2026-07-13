@@ -1,9 +1,10 @@
 import type { Stock } from '../types/stock'
+import { parseMarketCap, fmtMarketCap } from './marketCap'
 
 export const REFERENCE_DATE = new Date('2026-06-02')
 
 // Mulberry32 seeded PRNG — deterministic for a given date+ticker pair
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5)
     t = Math.imul(t ^ (t >>> 15), t | 1)
@@ -18,20 +19,6 @@ function dateToInt(d: Date) {
 
 function tickerInt(ticker: string) {
   return ticker.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 7), 0)
-}
-
-function parseMarketCap(s: string): number {
-  const m = s.match(/^\$([0-9.]+)([KMBT])$/)
-  if (!m) return 0
-  const mults: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }
-  return parseFloat(m[1]) * mults[m[2]]
-}
-
-function fmtMarketCap(v: number): string {
-  if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`
-  return `$${(v / 1e3).toFixed(0)}K`
 }
 
 export function getHistoricalStocks(stocks: Stock[], targetDate: Date): Stock[] {
