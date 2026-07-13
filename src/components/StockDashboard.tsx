@@ -6,6 +6,7 @@ import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 import { parseMarketCap } from '../utils/marketCap'
+import { computeRSI14 } from '../utils/rsi'
 
 type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
 
@@ -449,11 +450,12 @@ export function StockDashboard() {
               <Th label="P/S" right {...thProps} />
               <Th label="P/E" right {...thProps} />
               <Th label="% YTD" sk="pctYTD" {...thProps} />
+              <Th label="% 1Y" sk="pct1Y" {...thProps} />
               <Th label="Chart 1M" {...thProps} />
               <Th label="Chart 1Y" {...thProps} />
-              <Th label="% 1Y" sk="pct1Y" {...thProps} />
               <Th label="Δ Highs" sk="deltaHighs" {...thProps} />
               <Th label="RS" sk="rsRank" {...thProps} />
+              <Th label="RSI(14)" {...thProps} />
               <Th label="1W %" sk="ret1W" {...thProps} />
               <Th label="1M %" sk="ret1M" {...thProps} />
               <Th label="3M %" sk="ret3M" {...thProps} />
@@ -555,16 +557,6 @@ export function StockDashboard() {
                     </div>
                   </td>
 
-                  {/* Sparkline 1M — recent tail of the series */}
-                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
-                    <Sparkline data={s.sparklineData.slice(-8)} width={56} height={26} positive={s.ret1M >= 0} />
-                  </td>
-
-                  {/* Sparkline 1Y */}
-                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
-                    <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos} />
-                  </td>
-
                   {/* % 1Y */}
                   <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
@@ -575,6 +567,16 @@ export function StockDashboard() {
                     }}>
                       {fmtPct(s.pct1Y)}
                     </span>
+                  </td>
+
+                  {/* Sparkline 1M — recent tail of the series */}
+                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
+                    <Sparkline data={s.sparklineData.slice(-8)} width={56} height={26} positive={s.ret1M >= 0} />
+                  </td>
+
+                  {/* Sparkline 1Y */}
+                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
+                    <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos} />
                   </td>
 
                   {/* Delta Highs */}
@@ -595,6 +597,27 @@ export function StockDashboard() {
                     }}>
                       {s.rsRank}
                     </span>
+                  </td>
+
+                  {/* RSI(14) */}
+                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
+                    {(() => {
+                      const rsi = computeRSI14(s)
+                      const overbought = rsi >= 70
+                      const oversold = rsi <= 30
+                      return (
+                        <span style={{
+                          display: 'inline-block',
+                          background: overbought ? 'rgba(246,173,85,0.15)' : oversold ? 'rgba(99,179,237,0.15)' : 'transparent',
+                          color: overbought ? '#c05621' : oversold ? '#2b6cb0' : t.textSecondary,
+                          fontWeight: overbought || oversold ? 700 : 500,
+                          fontSize: 11.5,
+                          borderRadius: 4, padding: '2px 7px',
+                        }}>
+                          {rsi}
+                        </span>
+                      )
+                    })()}
                   </td>
 
                   {/* Period returns */}
@@ -628,7 +651,7 @@ export function StockDashboard() {
                 {totalMktCap}
               </td>
               <td colSpan={2} />
-              <td colSpan={13} />
+              <td colSpan={14} />
             </tr>
           </tfoot>
         </table>
