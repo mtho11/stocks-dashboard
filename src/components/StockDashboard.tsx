@@ -11,7 +11,7 @@ import { computeRSI14 } from '../utils/rsi'
 type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
 
 const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
-  'ai-cake':  { stocks: aiCakeStocks, title: "Jensen's 5-Layer AI Cake" },
+  'ai-cake':  { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
   'nasdaq100':{ stocks: nasdaq100,    title: 'Nasdaq 100' },
   'sp500':    { stocks: sp500,        title: 'S&P 500' },
 }
