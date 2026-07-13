@@ -467,7 +467,13 @@ export function StockDashboard() {
           </thead>
           <tbody>
             {sorted.map((s, i) => {
-              const isPos = s.pctYTD >= 0
+              const spark1M = s.sparklineData.slice(-8)
+              // Color each chart by its own plotted trend (first vs last
+              // point), not an unrelated return field — sparklineData is an
+              // independent random walk, so e.g. ret1M's sign can disagree
+              // with what a given window of it actually shows.
+              const isPos1M = spark1M[spark1M.length - 1] >= spark1M[0]
+              const isPos1Y = s.sparklineData[s.sparklineData.length - 1] >= s.sparklineData[0]
               const rowBg = i % 2 === 0 ? t.panelBg : t.panelBg2
               const cellBorder = `1px solid ${t.borderInner}`
               return (
@@ -571,12 +577,12 @@ export function StockDashboard() {
 
                   {/* Sparkline 1M — recent tail of the series */}
                   <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
-                    <Sparkline data={s.sparklineData.slice(-8)} width={56} height={26} positive={s.ret1M >= 0} />
+                    <Sparkline data={spark1M} width={56} height={26} positive={isPos1M} />
                   </td>
 
                   {/* Sparkline 1Y */}
                   <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
-                    <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos} />
+                    <Sparkline data={s.sparklineData} width={80} height={26} positive={isPos1Y} />
                   </td>
 
                   {/* Delta Highs */}
