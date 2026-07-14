@@ -7,8 +7,13 @@ import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 import { parseMarketCap } from '../utils/marketCap'
 import { computeRSI14 } from '../utils/rsi'
+import { parseUrlState, buildUrlPath } from '../utils/urlState'
 
 type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
+const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500']
+function isStockListId(v: string | undefined): v is StockListId {
+  return !!v && (STOCK_LIST_IDS as string[]).includes(v)
+}
 
 const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'ai-cake':  { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
@@ -18,7 +23,21 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
 const MIN_DATE = '2024-01-01'
+const TODAY_STR = new Date().toISOString().slice(0, 10)
+// The date input's ceiling: real "today" once it passes the mock timeline's
+// reference date (the normal case), otherwise the reference date itself.
+const MAX_DATE = TODAY_STR > REF_STR ? TODAY_STR : REF_STR
 const THEME_KEY = 'stocks-dashboard-theme'
+const BASE_PATH = import.meta.env.BASE_URL
+
+function readUrlState(): { listId: StockListId; date: string } {
+  if (typeof window === 'undefined') return { listId: 'ai-cake', date: TODAY_STR }
+  const { listId, date } = parseUrlState(window.location.pathname, BASE_PATH)
+  return {
+    listId: isStockListId(listId) ? listId : 'ai-cake',
+    date: date && date >= MIN_DATE && date <= MAX_DATE ? date : TODAY_STR,
+  }
+}
 
 function formatDisplayDate(iso: string) {
   const [y, m, d] = iso.split('-')
@@ -230,12 +249,25 @@ function getInitialTheme(): ThemeMode {
 
 export function StockDashboard() {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
-  const [stockListId, setStockListId] = useState<StockListId>('ai-cake')
+  const [initialUrlState] = useState(readUrlState)
+  const [stockListId, setStockListId] = useState<StockListId>(initialUrlState.listId)
   const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
-  const [selectedDate, setSelectedDate] = useState(REF_STR)
+  const [selectedDate, setSelectedDate] = useState(initialUrlState.date)
+
+  // Keep the URL in sync with list + date so the app state is bookmarkable
+  // and shareable, e.g. /stocks-dashboard/nasdaq100/2026-07-13. Uses
+  // replaceState (not pushState) so picking dates/lists doesn't spam
+  // browser history — editing the URL bar directly still works since that's
+  // a real navigation, which re-reads it via readUrlState() on load.
+  useEffect(() => {
+    const path = buildUrlPath(BASE_PATH, stockListId, selectedDate)
+    if (window.location.pathname !== path) {
+      window.history.replaceState(null, '', path + window.location.search)
+    }
+  }, [stockListId, selectedDate])
 
   const isDark = mode === 'dark'
   const t = THEMES[mode]
@@ -259,6 +291,7 @@ export function StockDashboard() {
   }, [activeList.title])
 
   const isHistorical = selectedDate < REF_STR
+  const isToday = selectedDate === TODAY_STR
 
   const baseStocks = useMemo(() => {
     if (!isHistorical) return sourceStocks
@@ -407,7 +440,7 @@ export function StockDashboard() {
           <input
             type="date"
             min={MIN_DATE}
-            max={REF_STR}
+            max={MAX_DATE}
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
             style={{
@@ -417,9 +450,9 @@ export function StockDashboard() {
               padding: '7px 10px', fontSize: 12, outline: 'none', cursor: 'pointer',
             }}
           />
-          {isHistorical && (
+          {!isToday && (
             <button
-              onClick={() => setSelectedDate(REF_STR)}
+              onClick={() => setSelectedDate(TODAY_STR)}
               style={{
                 padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', border: '1px solid #744210',
