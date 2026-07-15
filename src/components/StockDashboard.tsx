@@ -501,7 +501,12 @@ export function StockDashboard() {
           </thead>
           <tbody>
             {sorted.map((s, i) => {
-              const spark1W = s.sparklineData.slice(-4)
+              // 6 points (not fewer) so the curve keeps real texture — at
+              // 4 points a short window is almost always monotonic, and the
+              // y-scale's proportional padding then pins the first/last
+              // point to nearly the same pixel position for every stock,
+              // making every row's chart look like the same flat diagonal.
+              const spark1W = s.sparklineData.slice(-6)
               const spark1M = s.sparklineData.slice(-8)
               // Color each chart by its own plotted trend (first vs last
               // point), not an unrelated return field — sparklineData is an
@@ -613,7 +618,7 @@ export function StockDashboard() {
 
                   {/* Sparkline 1W — shortest recent tail of the series */}
                   <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
-                    <Sparkline data={spark1W} width={40} height={26} positive={isPos1W} />
+                    <Sparkline data={spark1W} width={48} height={26} positive={isPos1W} />
                   </td>
 
                   {/* Sparkline 1M — recent tail of the series */}
