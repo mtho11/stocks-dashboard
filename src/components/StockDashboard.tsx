@@ -470,7 +470,7 @@ export function StockDashboard() {
       <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${t.borderOuter}` }}>
         <table style={{
           width: '100%', borderCollapse: 'collapse',
-          fontSize: 12.5, minWidth: 1000,
+          fontSize: 12.5, minWidth: 1040,
         }}>
           <thead>
             <tr>
@@ -484,6 +484,7 @@ export function StockDashboard() {
               <Th label="P/E" right {...thProps} />
               <Th label="% YTD" sk="pctYTD" {...thProps} />
               <Th label="% 1Y" sk="pct1Y" {...thProps} />
+              <Th label="Chart 1W" {...thProps} />
               <Th label="Chart 1M" {...thProps} />
               <Th label="Chart 1Y" {...thProps} />
               <Th label="Δ Highs" sk="deltaHighs" {...thProps} />
@@ -500,11 +501,13 @@ export function StockDashboard() {
           </thead>
           <tbody>
             {sorted.map((s, i) => {
+              const spark1W = s.sparklineData.slice(-4)
               const spark1M = s.sparklineData.slice(-8)
               // Color each chart by its own plotted trend (first vs last
               // point), not an unrelated return field — sparklineData is an
               // independent random walk, so e.g. ret1M's sign can disagree
               // with what a given window of it actually shows.
+              const isPos1W = spark1W[spark1W.length - 1] >= spark1W[0]
               const isPos1M = spark1M[spark1M.length - 1] >= spark1M[0]
               const isPos1Y = s.sparklineData[s.sparklineData.length - 1] >= s.sparklineData[0]
               const rowBg = i % 2 === 0 ? t.panelBg : t.panelBg2
@@ -608,6 +611,11 @@ export function StockDashboard() {
                     </span>
                   </td>
 
+                  {/* Sparkline 1W — shortest recent tail of the series */}
+                  <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
+                    <Sparkline data={spark1W} width={40} height={26} positive={isPos1W} />
+                  </td>
+
                   {/* Sparkline 1M — recent tail of the series */}
                   <td style={{ padding: '4px 6px', borderBottom: cellBorder }}>
                     <Sparkline data={spark1M} width={56} height={26} positive={isPos1M} />
@@ -690,7 +698,7 @@ export function StockDashboard() {
                 {totalMktCap}
               </td>
               <td colSpan={2} />
-              <td colSpan={14} />
+              <td colSpan={15} />
             </tr>
           </tfoot>
         </table>
