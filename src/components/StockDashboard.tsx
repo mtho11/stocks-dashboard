@@ -9,6 +9,8 @@ import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 import { parseMarketCap } from '../utils/marketCap'
 import { computeRSI14 } from '../utils/rsi'
 import { parseUrlState, buildUrlPath } from '../utils/urlState'
+import { navigateTo } from '../utils/nav'
+import { THEMES, THEME_KEY, getInitialTheme, darken, type ThemeMode, type Theme } from '../utils/theme'
 
 type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji'
 const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji']
@@ -41,7 +43,6 @@ const TODAY_STR = new Date().toISOString().slice(0, 10)
 // The date input's ceiling: real "today" once it passes the mock timeline's
 // reference date (the normal case), otherwise the reference date itself.
 const MAX_DATE = TODAY_STR > REF_STR ? TODAY_STR : REF_STR
-const THEME_KEY = 'stocks-dashboard-theme'
 const FAVORITES_KEY = 'stocks-dashboard-favorites'
 const CUSTOM_LISTS_KEY = 'stocks-dashboard-custom-lists'
 const BASE_PATH = import.meta.env.BASE_URL
@@ -190,41 +191,6 @@ function passesFilters(s: Stock, f: AdvancedFilters): boolean {
   return true
 }
 
-// ── Theme tokens ──────────────────────────────────────────────────────────
-const THEMES = {
-  dark: {
-    pageBg: '#0a0a0f',
-    panelBg: '#0d1117',
-    panelBg2: '#0f1419',
-    hoverBg: '#1a202c',
-    borderOuter: '#1a202c',
-    borderInner: '#161b22',
-    borderControl: '#2d3748',
-    textMuted: '#4a5568',
-    textSecondary: '#718096',
-    textPrimary: '#e2e8f0',
-    inputBg: '#161b22',
-    gradient: 'linear-gradient(135deg, #90cdf4 0%, #68d391 50%, #f6ad55 100%)',
-  },
-  light: {
-    pageBg: '#f3f4f7',
-    panelBg: '#ffffff',
-    panelBg2: '#f8f9fb',
-    hoverBg: '#eef1f6',
-    borderOuter: '#e2e5eb',
-    borderInner: '#edeef2',
-    borderControl: '#d5d9e0',
-    textMuted: '#64748b',
-    textSecondary: '#475569',
-    textPrimary: '#1a202c',
-    inputBg: '#ffffff',
-    gradient: 'linear-gradient(135deg, #2b6cb0 0%, #2f855a 50%, #c05621 100%)',
-  },
-} as const
-
-type ThemeMode = 'dark' | 'light'
-type Theme = (typeof THEMES)[ThemeMode]
-
 // Top-level so its component identity is stable across renders — defining
 // it inside StockDashboard remounted every header cell on each render.
 function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
@@ -263,19 +229,6 @@ function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
       </span>
     </th>
   )
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
-  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-
-// Darkens a pastel/light hex color so it reads on a light background.
-function darken(hex: string, amt = 0.42): string {
-  const [r, g, b] = hexToRgb(hex)
-  const f = (v: number) => Math.round(v * (1 - amt)).toString(16).padStart(2, '0')
-  return `#${f(r)}${f(g)}${f(b)}`
 }
 
 function SMABadge({ dir }: { dir: 'up' | 'down' }) {
@@ -427,13 +380,6 @@ function fmt(n: number | null, decimals = 2): string {
 function fmtPct(n: number): string {
   const sign = n >= 0 ? '+' : ''
   return `${sign}${fmt(n)}%`
-}
-
-function getInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'dark'
-  const stored = window.localStorage.getItem(THEME_KEY)
-  if (stored === 'dark' || stored === 'light') return stored
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 export function StockDashboard() {
@@ -626,21 +572,36 @@ export function StockDashboard() {
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
       {/* Header */}
       <div style={{ position: 'relative', textAlign: 'center', marginBottom: 28 }}>
-        <button
-          onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
-          aria-label="Toggle light/dark theme"
-          style={{
-            position: 'absolute', top: 0, right: 0,
-            width: 36, height: 36, borderRadius: 10,
-            border: `1px solid ${t.borderControl}`,
-            background: t.inputBg,
-            color: t.textSecondary,
-            cursor: 'pointer', fontSize: 16,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {isDark ? '☀️' : '🌙'}
-        </button>
+        <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => navigateTo(`${BASE_PATH}about`)}
+            aria-label="About this app"
+            style={{
+              width: 36, height: 36, borderRadius: 10,
+              border: `1px solid ${t.borderControl}`,
+              background: t.inputBg,
+              color: t.textSecondary,
+              cursor: 'pointer', fontSize: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ℹ️
+          </button>
+          <button
+            onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
+            aria-label="Toggle light/dark theme"
+            style={{
+              width: 36, height: 36, borderRadius: 10,
+              border: `1px solid ${t.borderControl}`,
+              background: t.inputBg,
+              color: t.textSecondary,
+              cursor: 'pointer', fontSize: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+        </div>
         <h1 style={{
           fontSize: 'clamp(22px, 4vw, 38px)',
           fontWeight: 800,
