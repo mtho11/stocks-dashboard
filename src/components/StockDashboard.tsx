@@ -28,7 +28,21 @@ const TODAY_STR = new Date().toISOString().slice(0, 10)
 // reference date (the normal case), otherwise the reference date itself.
 const MAX_DATE = TODAY_STR > REF_STR ? TODAY_STR : REF_STR
 const THEME_KEY = 'stocks-dashboard-theme'
+const FAVORITES_KEY = 'stocks-dashboard-favorites'
 const BASE_PATH = import.meta.env.BASE_URL
+
+// Favorites are stored per stock list ({ [listId]: ticker[] }) so marking
+// AAPL a favorite in Nasdaq 100 doesn't bleed into the S&P 500 view.
+function loadFavorites(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
 
 function readUrlState(): { listId: StockListId; date: string } {
   if (typeof window === 'undefined') return { listId: 'ai-cake', date: TODAY_STR }
@@ -45,8 +59,15 @@ function formatDisplayDate(iso: string) {
   return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`
 }
 
-type SortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
+type StockSortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
+type SortKey = StockSortKey | 'favorite'
 type SortDir = 'asc' | 'desc'
+
+function getSortValue(s: Stock, key: SortKey, favorites: Set<string>): number | string {
+  if (key === 'favorite') return favorites.has(s.ticker) ? 1 : 0
+  if (key === 'marketCap') return parseMarketCap(s.marketCap)
+  return s[key]
+}
 
 // ── Theme tokens ──────────────────────────────────────────────────────────
 const THEMES = {
@@ -256,6 +277,11 @@ export function StockDashboard() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
   const [selectedDate, setSelectedDate] = useState(initialUrlState.date)
+  const [favoritesByList, setFavoritesByList] = useState<Record<string, string[]>>(loadFavorites)
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoritesByList))
+  }, [favoritesByList])
 
   // Keep the URL in sync with list + date so the app state is bookmarkable
   // and shareable, e.g. /stocks-dashboard/nasdaq100/2026-07-13. Uses
@@ -290,6 +316,20 @@ export function StockDashboard() {
     document.title = activeList.title
   }, [activeList.title])
 
+  const favorites = useMemo(
+    () => new Set(favoritesByList[stockListId] ?? []),
+    [favoritesByList, stockListId]
+  )
+
+  function toggleFavorite(ticker: string) {
+    setFavoritesByList(prev => {
+      const current = new Set(prev[stockListId] ?? [])
+      if (current.has(ticker)) current.delete(ticker)
+      else current.add(ticker)
+      return { ...prev, [stockListId]: [...current] }
+    })
+  }
+
   const isHistorical = selectedDate < REF_STR
   const isToday = selectedDate === TODAY_STR
 
@@ -309,15 +349,16 @@ export function StockDashboard() {
 
     list.sort((a, b) => {
       // Market cap is a display string ("$254.2B") — compare numerically,
-      // otherwise it sorts alphabetically ($850.4B above $5.4T).
-      const av = sortKey === 'marketCap' ? parseMarketCap(a.marketCap) : a[sortKey]
-      const bv = sortKey === 'marketCap' ? parseMarketCap(b.marketCap) : b[sortKey]
+      // otherwise it sorts alphabetically ($850.4B above $5.4T). Favorite
+      // is synthetic (not a Stock field) — getSortValue maps it to 1/0.
+      const av = getSortValue(a, sortKey, favorites)
+      const bv = getSortValue(b, sortKey, favorites)
       if (av < bv) return sortDir === 'asc' ? -1 : 1
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
     })
     return list
-  }, [sortKey, sortDir, search, filter, baseStocks])
+  }, [sortKey, sortDir, search, filter, baseStocks, favorites])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -470,10 +511,11 @@ export function StockDashboard() {
       <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${t.borderOuter}` }}>
         <table style={{
           width: '100%', borderCollapse: 'collapse',
-          fontSize: 12.5, minWidth: 1040,
+          fontSize: 12.5, minWidth: 1070,
         }}>
           <thead>
             <tr>
+              <Th label="★" sk="favorite" {...thProps} />
               <Th label="#" {...thProps} />
               <Th label="Ticker" sk="ticker" {...thProps} />
               <Th label="Company" sk="company" {...thProps} />
@@ -517,6 +559,7 @@ export function StockDashboard() {
               const isPos1Y = s.sparklineData[s.sparklineData.length - 1] >= s.sparklineData[0]
               const rowBg = i % 2 === 0 ? t.panelBg : t.panelBg2
               const cellBorder = `1px solid ${t.borderInner}`
+              const isFavorite = favorites.has(s.ticker)
               return (
                 <tr key={s.ticker} style={{
                   background: rowBg,
@@ -525,6 +568,22 @@ export function StockDashboard() {
                   onMouseEnter={e => (e.currentTarget.style.background = t.hoverBg)}
                   onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
+                  {/* Favorite */}
+                  <td style={{ padding: '7px 4px', textAlign: 'center', borderBottom: cellBorder }}>
+                    <button
+                      onClick={() => toggleFavorite(s.ticker)}
+                      aria-label={isFavorite ? `Remove ${s.ticker} from favorites` : `Add ${s.ticker} to favorites`}
+                      aria-pressed={isFavorite}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: 2, fontSize: 15, lineHeight: 1,
+                        color: isFavorite ? '#f6ad55' : t.borderControl,
+                      }}
+                    >
+                      {isFavorite ? '★' : '☆'}
+                    </button>
+                  </td>
+
                   {/* Rank */}
                   <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
@@ -696,7 +755,7 @@ export function StockDashboard() {
           </tbody>
           <tfoot>
             <tr style={{ background: t.panelBg, borderTop: `2px solid ${t.borderControl}` }}>
-              <td colSpan={5} style={{ padding: '10px 8px', color: t.textMuted, fontSize: 11 }}>
+              <td colSpan={6} style={{ padding: '10px 8px', color: t.textMuted, fontSize: 11 }}>
                 Sum / Avg
               </td>
               <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, fontWeight: 700, fontSize: 12 }}>
