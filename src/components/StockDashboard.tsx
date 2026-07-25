@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { stocks as aiCakeStocks } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
 import { sp500 } from '../data/sp500'
+import { dji } from '../data/dji'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
@@ -9,8 +10,8 @@ import { parseMarketCap } from '../utils/marketCap'
 import { computeRSI14 } from '../utils/rsi'
 import { parseUrlState, buildUrlPath } from '../utils/urlState'
 
-type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500'
-const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500']
+type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji'
+const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji']
 function isStockListId(v: string | undefined): v is StockListId {
   return !!v && (STOCK_LIST_IDS as string[]).includes(v)
 }
@@ -19,6 +20,7 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'ai-cake':  { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
   'nasdaq100':{ stocks: nasdaq100,    title: 'Nasdaq 100' },
   'sp500':    { stocks: sp500,        title: 'S&P 500' },
+  'dji':      { stocks: dji,          title: 'Dow Jones Industrial Average' },
 }
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
@@ -577,6 +579,7 @@ export function StockDashboard() {
           <option value="ai-cake">🎂 AI Cake</option>
           <option value="nasdaq100">📊 Nasdaq 100</option>
           <option value="sp500">📈 S&amp;P 500</option>
+          <option value="dji">🏛 Dow 30</option>
         </select>
 
         <input
