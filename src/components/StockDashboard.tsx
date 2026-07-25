@@ -23,6 +23,18 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'dji':      { stocks: dji,          title: 'Dow Jones Industrial Average' },
 }
 
+// Every stock across the built-in lists, keyed by ticker — lets a custom
+// list pull any stock regardless of which built-in list it "lives" in.
+// First list wins on overlap; the shared tickers were kept numerically
+// consistent across files anyway.
+const ALL_STOCKS_BY_TICKER: Record<string, Stock> = {}
+for (const list of [aiCakeStocks, nasdaq100, sp500, dji]) {
+  for (const s of list) {
+    if (!(s.ticker in ALL_STOCKS_BY_TICKER)) ALL_STOCKS_BY_TICKER[s.ticker] = s
+  }
+}
+const ALL_TICKERS = Object.keys(ALL_STOCKS_BY_TICKER).sort()
+
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
 const MIN_DATE = '2024-01-01'
 const TODAY_STR = new Date().toISOString().slice(0, 10)
@@ -31,6 +43,7 @@ const TODAY_STR = new Date().toISOString().slice(0, 10)
 const MAX_DATE = TODAY_STR > REF_STR ? TODAY_STR : REF_STR
 const THEME_KEY = 'stocks-dashboard-theme'
 const FAVORITES_KEY = 'stocks-dashboard-favorites'
+const CUSTOM_LISTS_KEY = 'stocks-dashboard-custom-lists'
 const BASE_PATH = import.meta.env.BASE_URL
 
 // Favorites are stored per stock list ({ [listId]: ticker[] }) so marking
@@ -46,11 +59,54 @@ function loadFavorites(): Record<string, string[]> {
   }
 }
 
-function readUrlState(): { listId: StockListId; date: string } {
+interface CustomList {
+  id: string
+  name: string
+  tickers: string[]
+}
+
+function loadCustomLists(): CustomList[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_LISTS_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function makeListId(): string {
+  return `custom-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
+// Resolves either a built-in StockListId or a custom list's id to its
+// stock array + display title. Falls back to the AI Cake list if the id
+// matches neither (e.g. a stale/edited URL, or a deleted custom list).
+function resolveActiveList(id: string, customLists: CustomList[]): { stocks: Stock[]; title: string } {
+  if (isStockListId(id)) return STOCK_LISTS[id]
+  const cl = customLists.find(l => l.id === id)
+  if (!cl) return STOCK_LISTS['ai-cake']
+  const stocks = cl.tickers.map(t => ALL_STOCKS_BY_TICKER[t]).filter((s): s is Stock => !!s)
+  if (stocks.length < 2) return { stocks, title: cl.name || 'Custom List' }
+  // Recompute RS rank relative to this custom cohort rather than leaving
+  // whatever rank each stock happened to have in its source list.
+  const byPerf = [...stocks].sort((a, b) => b.pct1Y - a.pct1Y)
+  const n = byPerf.length - 1
+  const ranked = stocks.map(s => {
+    const rank = byPerf.findIndex(x => x.ticker === s.ticker)
+    return { ...s, rsRank: Math.round(99 - (rank / n) * 65) }
+  })
+  return { stocks: ranked, title: cl.name || 'Custom List' }
+}
+
+function readUrlState(): { listId: string; date: string } {
   if (typeof window === 'undefined') return { listId: 'ai-cake', date: TODAY_STR }
   const { listId, date } = parseUrlState(window.location.pathname, BASE_PATH)
+  const customLists = loadCustomLists()
+  const validListId = listId && (isStockListId(listId) || customLists.some(l => l.id === listId)) ? listId : 'ai-cake'
   return {
-    listId: isStockListId(listId) ? listId : 'ai-cake',
+    listId: validListId,
     date: date && date >= MIN_DATE && date <= MAX_DATE ? date : TODAY_STR,
   }
 }
@@ -383,7 +439,7 @@ function getInitialTheme(): ThemeMode {
 export function StockDashboard() {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
   const [initialUrlState] = useState(readUrlState)
-  const [stockListId, setStockListId] = useState<StockListId>(initialUrlState.listId)
+  const [stockListId, setStockListId] = useState<string>(initialUrlState.listId)
   const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
@@ -392,10 +448,52 @@ export function StockDashboard() {
   const [favoritesByList, setFavoritesByList] = useState<Record<string, string[]>>(loadFavorites)
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(createEmptyFilters)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [customLists, setCustomLists] = useState<CustomList[]>(loadCustomLists)
+  const [listsPanelOpen, setListsPanelOpen] = useState(false)
+  const [newListName, setNewListName] = useState('')
+  const [tickerInput, setTickerInput] = useState('')
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoritesByList))
   }, [favoritesByList])
+
+  useEffect(() => {
+    window.localStorage.setItem(CUSTOM_LISTS_KEY, JSON.stringify(customLists))
+  }, [customLists])
+
+  function createCustomList() {
+    const name = newListName.trim()
+    if (!name) return
+    const id = makeListId()
+    setCustomLists(prev => [...prev, { id, name, tickers: [] }])
+    setNewListName('')
+    setStockListId(id)
+  }
+
+  function renameCustomList(id: string, name: string) {
+    setCustomLists(prev => prev.map(l => l.id === id ? { ...l, name } : l))
+  }
+
+  function deleteCustomList(id: string) {
+    if (!window.confirm('Delete this list? This cannot be undone.')) return
+    setCustomLists(prev => prev.filter(l => l.id !== id))
+    if (stockListId === id) setStockListId('ai-cake')
+  }
+
+  function addTickerToList(id: string, rawTicker: string) {
+    const ticker = rawTicker.trim().toUpperCase()
+    if (!ticker || !ALL_STOCKS_BY_TICKER[ticker]) return
+    setCustomLists(prev => prev.map(l =>
+      l.id === id && !l.tickers.includes(ticker) ? { ...l, tickers: [...l.tickers, ticker] } : l
+    ))
+    setTickerInput('')
+  }
+
+  function removeTickerFromList(id: string, ticker: string) {
+    setCustomLists(prev => prev.map(l =>
+      l.id === id ? { ...l, tickers: l.tickers.filter(t => t !== ticker) } : l
+    ))
+  }
 
   // Keep the URL in sync with list + date so the app state is bookmarkable
   // and shareable, e.g. /stocks-dashboard/nasdaq100/2026-07-13. Uses
@@ -423,8 +521,9 @@ export function StockDashboard() {
   // Darkens light/pastel accent colors so they stay legible on a light page.
   const ink = useCallback((hex: string) => (isDark ? hex : darken(hex)), [isDark])
 
-  const activeList = STOCK_LISTS[stockListId]
+  const activeList = useMemo(() => resolveActiveList(stockListId, customLists), [stockListId, customLists])
   const sourceStocks = activeList.stocks
+  const activeCustomList = customLists.find(l => l.id === stockListId)
 
   useEffect(() => {
     document.title = activeList.title
@@ -554,7 +653,7 @@ export function StockDashboard() {
         <select
           value={stockListId}
           onChange={e => {
-            setStockListId(e.target.value as StockListId)
+            setStockListId(e.target.value)
             setSearch('')
             setFilter('all')
             setAdvancedFilters(createEmptyFilters())
@@ -576,11 +675,194 @@ export function StockDashboard() {
             backgroundPosition: 'right 10px center',
           }}
         >
-          <option value="ai-cake">🎂 AI Cake</option>
-          <option value="nasdaq100">📊 Nasdaq 100</option>
-          <option value="sp500">📈 S&amp;P 500</option>
-          <option value="dji">🏛 Dow 30</option>
+          <optgroup label="Indices">
+            <option value="ai-cake">🎂 AI Cake</option>
+            <option value="nasdaq100">📊 Nasdaq 100</option>
+            <option value="sp500">📈 S&amp;P 500</option>
+            <option value="dji">🏛 Dow 30</option>
+          </optgroup>
+          {customLists.length > 0 && (
+            <optgroup label="My Lists">
+              {customLists.map(cl => (
+                <option key={cl.id} value={cl.id}>📁 {cl.name} ({cl.tickers.length})</option>
+              ))}
+            </optgroup>
+          )}
         </select>
+
+        {/* Custom list manager */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setListsPanelOpen(o => !o)}
+            style={{
+              padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', letterSpacing: '0.04em',
+              border: `1px solid ${t.borderControl}`,
+              background: t.inputBg, color: t.textSecondary,
+            }}
+          >
+            📁 My Lists
+          </button>
+
+          {listsPanelOpen && (
+            <>
+              <div
+                onClick={() => setListsPanelOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+              />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 20,
+                width: 320, maxHeight: 460, overflowY: 'auto',
+                background: t.panelBg, border: `1px solid ${t.borderOuter}`,
+                borderRadius: 12, padding: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+                textAlign: 'left',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: t.textPrimary }}>Custom Lists</span>
+                  <button
+                    onClick={() => setListsPanelOpen(false)}
+                    aria-label="Close my lists"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 14, lineHeight: 1 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Create new list */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                  <input
+                    type="text"
+                    placeholder="New list name…"
+                    value={newListName}
+                    onChange={e => setNewListName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && createCustomList()}
+                    style={{
+                      flex: 1, background: t.inputBg, border: `1px solid ${t.borderControl}`,
+                      borderRadius: 6, color: t.textPrimary, fontSize: 12, padding: '6px 8px', outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={createCustomList}
+                    disabled={!newListName.trim()}
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                      border: 'none', cursor: newListName.trim() ? 'pointer' : 'default',
+                      background: newListName.trim() ? '#2f855a' : t.borderControl,
+                      color: newListName.trim() ? '#e2e8f0' : t.textMuted,
+                    }}
+                  >
+                    + Create
+                  </button>
+                </div>
+
+                {customLists.length === 0 && (
+                  <div style={{ fontSize: 11.5, color: t.textMuted, marginBottom: 4 }}>
+                    No custom lists yet — create one above, then add any ticker to it.
+                  </div>
+                )}
+
+                {customLists.map(cl => {
+                  const isActive = cl.id === stockListId
+                  return (
+                    <div key={cl.id} style={{
+                      border: `1px solid ${isActive ? '#2f855a' : t.borderOuter}`,
+                      borderRadius: 8, padding: 10, marginBottom: 8,
+                      background: isActive ? 'rgba(72,187,120,0.06)' : 'transparent',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: isActive ? 8 : 0 }}>
+                        <input
+                          type="text"
+                          value={cl.name}
+                          onChange={e => renameCustomList(cl.id, e.target.value)}
+                          style={{
+                            flex: 1, background: 'transparent', border: 'none',
+                            color: t.textPrimary, fontSize: 12.5, fontWeight: 600, outline: 'none', padding: '2px 0',
+                          }}
+                        />
+                        <span style={{ fontSize: 10.5, color: t.textMuted, whiteSpace: 'nowrap' }}>{cl.tickers.length} tickers</span>
+                        {!isActive && (
+                          <button
+                            onClick={() => setStockListId(cl.id)}
+                            style={{
+                              padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600,
+                              border: 'none', cursor: 'pointer', background: t.borderControl, color: t.textPrimary,
+                            }}
+                          >
+                            View
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteCustomList(cl.id)}
+                          aria-label={`Delete ${cl.name}`}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53e3e', fontSize: 13, lineHeight: 1, padding: 2 }}
+                        >
+                          🗑
+                        </button>
+                      </div>
+
+                      {isActive && (
+                        <>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                            {cl.tickers.map(ticker => (
+                              <span key={ticker} style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                background: t.inputBg, border: `1px solid ${t.borderControl}`,
+                                borderRadius: 5, padding: '2px 4px 2px 8px', fontSize: 10.5, color: t.textPrimary,
+                              }}>
+                                {ticker}
+                                <button
+                                  onClick={() => removeTickerFromList(cl.id, ticker)}
+                                  aria-label={`Remove ${ticker}`}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 12, lineHeight: 1, padding: '0 2px' }}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                            {cl.tickers.length === 0 && (
+                              <span style={{ fontSize: 10.5, color: t.textMuted }}>No tickers yet</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              type="text"
+                              list="all-tickers-datalist"
+                              placeholder="Add ticker (e.g. AAPL)…"
+                              value={tickerInput}
+                              onChange={e => setTickerInput(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && addTickerToList(cl.id, tickerInput)}
+                              style={{
+                                flex: 1, background: t.inputBg, border: `1px solid ${t.borderControl}`,
+                                borderRadius: 6, color: t.textPrimary, fontSize: 11.5, padding: '5px 7px', outline: 'none',
+                              }}
+                            />
+                            <button
+                              onClick={() => addTickerToList(cl.id, tickerInput)}
+                              style={{
+                                padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                border: 'none', cursor: 'pointer', background: t.borderControl, color: t.textPrimary,
+                              }}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <datalist id="all-tickers-datalist">
+          {ALL_TICKERS.map(ticker => (
+            <option key={ticker} value={ticker}>
+              {ticker} — {ALL_STOCKS_BY_TICKER[ticker].company}
+            </option>
+          ))}
+        </datalist>
 
         <input
           type="text"
@@ -753,6 +1035,16 @@ export function StockDashboard() {
           )}
         </div>
       </div>
+
+      {activeCustomList && activeCustomList.tickers.length === 0 && (
+        <div style={{
+          textAlign: 'center', color: t.textMuted, fontSize: 13,
+          background: t.panelBg, border: `1px solid ${t.borderOuter}`,
+          borderRadius: 10, padding: '18px 16px', marginBottom: 16,
+        }}>
+          "{activeCustomList.name}" has no stocks yet. Open <strong>📁 My Lists</strong> above and add a ticker to get started.
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${t.borderOuter}` }}>
