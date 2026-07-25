@@ -786,27 +786,32 @@ export function StockDashboard() {
                       background: isActive ? 'rgba(72,187,120,0.06)' : 'transparent',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: isActive ? 8 : 0 }}>
-                        <input
-                          type="text"
-                          value={cl.name}
-                          onChange={e => renameCustomList(cl.id, e.target.value)}
-                          style={{
-                            flex: 1, background: 'transparent', border: 'none',
-                            color: t.textPrimary, fontSize: 12.5, fontWeight: 600, outline: 'none', padding: '2px 0',
-                          }}
-                        />
-                        <span style={{ fontSize: 10.5, color: t.textMuted, whiteSpace: 'nowrap' }}>{cl.tickers.length} tickers</span>
-                        {!isActive && (
+                        {isActive ? (
+                          <input
+                            type="text"
+                            value={cl.name}
+                            onChange={e => renameCustomList(cl.id, e.target.value)}
+                            style={{
+                              flex: 1, background: 'transparent', border: 'none',
+                              color: t.textPrimary, fontSize: 12.5, fontWeight: 600, outline: 'none', padding: '2px 0',
+                            }}
+                          />
+                        ) : (
+                          // Not an <input> here — clicking to rename a list you
+                          // aren't viewing looked identical to clicking to switch
+                          // to it, and only silently placed a cursor. Make the
+                          // whole name clickable to switch instead.
                           <button
                             onClick={() => switchList(cl.id)}
                             style={{
-                              padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600,
-                              border: 'none', cursor: 'pointer', background: t.borderControl, color: t.textPrimary,
+                              flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+                              color: t.textPrimary, fontSize: 12.5, fontWeight: 600, padding: '2px 0',
                             }}
                           >
-                            View
+                            {cl.name}
                           </button>
                         )}
+                        <span style={{ fontSize: 10.5, color: t.textMuted, whiteSpace: 'nowrap' }}>{cl.tickers.length} tickers</span>
                         <button
                           onClick={() => deleteCustomList(cl.id)}
                           aria-label={`Delete ${cl.name}`}
