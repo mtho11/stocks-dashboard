@@ -452,6 +452,7 @@ export function StockDashboard() {
   const [listsPanelOpen, setListsPanelOpen] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [tickerInput, setTickerInput] = useState('')
+  const [tickerError, setTickerError] = useState('')
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoritesByList))
@@ -467,7 +468,7 @@ export function StockDashboard() {
     const id = makeListId()
     setCustomLists(prev => [...prev, { id, name, tickers: [] }])
     setNewListName('')
-    setStockListId(id)
+    switchList(id)
   }
 
   function renameCustomList(id: string, name: string) {
@@ -477,16 +478,23 @@ export function StockDashboard() {
   function deleteCustomList(id: string) {
     if (!window.confirm('Delete this list? This cannot be undone.')) return
     setCustomLists(prev => prev.filter(l => l.id !== id))
-    if (stockListId === id) setStockListId('ai-cake')
+    if (stockListId === id) switchList('ai-cake')
   }
 
   function addTickerToList(id: string, rawTicker: string) {
     const ticker = rawTicker.trim().toUpperCase()
-    if (!ticker || !ALL_STOCKS_BY_TICKER[ticker]) return
+    if (!ticker) return
+    if (!ALL_STOCKS_BY_TICKER[ticker]) {
+      // Previously a silent no-op — indistinguishable from the button not
+      // working at all. Tell the user why instead.
+      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, or Dow 30, so it can't be added.`)
+      return
+    }
     setCustomLists(prev => prev.map(l =>
       l.id === id && !l.tickers.includes(ticker) ? { ...l, tickers: [...l.tickers, ticker] } : l
     ))
     setTickerInput('')
+    setTickerError('')
   }
 
   function removeTickerFromList(id: string, ticker: string) {
@@ -506,6 +514,14 @@ export function StockDashboard() {
       window.history.replaceState(null, '', path + window.location.search)
     }
   }, [stockListId, selectedDate])
+
+  // Switches the active list and clears any stale ticker-add state from
+  // whichever custom list's editor was previously open.
+  function switchList(id: string) {
+    setStockListId(id)
+    setTickerInput('')
+    setTickerError('')
+  }
 
   const isDark = mode === 'dark'
   const t = THEMES[mode]
@@ -653,7 +669,7 @@ export function StockDashboard() {
         <select
           value={stockListId}
           onChange={e => {
-            setStockListId(e.target.value)
+            switchList(e.target.value)
             setSearch('')
             setFilter('all')
             setAdvancedFilters(createEmptyFilters())
@@ -782,7 +798,7 @@ export function StockDashboard() {
                         <span style={{ fontSize: 10.5, color: t.textMuted, whiteSpace: 'nowrap' }}>{cl.tickers.length} tickers</span>
                         {!isActive && (
                           <button
-                            onClick={() => setStockListId(cl.id)}
+                            onClick={() => switchList(cl.id)}
                             style={{
                               padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600,
                               border: 'none', cursor: 'pointer', background: t.borderControl, color: t.textPrimary,
@@ -829,10 +845,11 @@ export function StockDashboard() {
                               list="all-tickers-datalist"
                               placeholder="Add ticker (e.g. AAPL)…"
                               value={tickerInput}
-                              onChange={e => setTickerInput(e.target.value)}
+                              onChange={e => { setTickerInput(e.target.value); setTickerError('') }}
                               onKeyDown={e => e.key === 'Enter' && addTickerToList(cl.id, tickerInput)}
                               style={{
-                                flex: 1, background: t.inputBg, border: `1px solid ${t.borderControl}`,
+                                flex: 1, background: t.inputBg,
+                                border: `1px solid ${tickerError ? '#e53e3e' : t.borderControl}`,
                                 borderRadius: 6, color: t.textPrimary, fontSize: 11.5, padding: '5px 7px', outline: 'none',
                               }}
                             />
@@ -846,6 +863,11 @@ export function StockDashboard() {
                               Add
                             </button>
                           </div>
+                          {tickerError && (
+                            <div style={{ color: '#e53e3e', fontSize: 10.5, marginTop: 5 }}>
+                              {tickerError}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
