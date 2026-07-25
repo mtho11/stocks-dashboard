@@ -787,6 +787,20 @@ export function StockDashboard() {
             value: String(baseStocks.filter(s => s.pctYTD < 0).length),
             color: '#e53e3e',
           },
+          {
+            label: '% Above 200D MA',
+            value: baseStocks.length
+              ? `${((baseStocks.filter(s => s.sma200 === 'up').length / baseStocks.length) * 100).toFixed(0)}%`
+              : '0%',
+            color: '#38a169',
+          },
+          {
+            label: '% Below 200D MA',
+            value: baseStocks.length
+              ? `${((baseStocks.filter(s => s.sma200 === 'down').length / baseStocks.length) * 100).toFixed(0)}%`
+              : '0%',
+            color: '#e53e3e',
+          },
         ].map(c => (
           <div key={c.label} style={{
             background: t.panelBg, border: `1px solid ${t.borderOuter}`,
