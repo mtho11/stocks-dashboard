@@ -69,6 +69,69 @@ function getSortValue(s: Stock, key: SortKey, favorites: Set<string>): number | 
   return s[key]
 }
 
+// ── Custom column filters ────────────────────────────────────────────────
+type RangeFilterKey = 'price' | 'marketCap' | 'pctYTD' | 'pct1Y' | 'deltaHighs' | 'rsRank' | 'rsi' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'
+type RangeValue = { min: string; max: string }
+type SmaFilterValue = 'any' | 'up' | 'down'
+
+interface RangeFilterDef {
+  key: RangeFilterKey
+  label: string
+  getValue: (s: Stock) => number
+}
+
+const RANGE_FILTER_DEFS: RangeFilterDef[] = [
+  { key: 'price', label: 'Price ($)', getValue: s => s.price },
+  { key: 'marketCap', label: 'Mkt Cap ($B)', getValue: s => parseMarketCap(s.marketCap) / 1e9 },
+  { key: 'pctYTD', label: '% YTD', getValue: s => s.pctYTD },
+  { key: 'pct1Y', label: '% 1Y', getValue: s => s.pct1Y },
+  { key: 'deltaHighs', label: 'Δ Highs (%)', getValue: s => s.deltaHighs },
+  { key: 'rsRank', label: 'RS Rank', getValue: s => s.rsRank },
+  { key: 'rsi', label: 'RSI(14)', getValue: s => computeRSI14(s) },
+  { key: 'ret1W', label: '1W %', getValue: s => s.ret1W },
+  { key: 'ret1M', label: '1M %', getValue: s => s.ret1M },
+  { key: 'ret3M', label: '3M %', getValue: s => s.ret3M },
+  { key: 'ret6M', label: '6M %', getValue: s => s.ret6M },
+]
+
+interface AdvancedFilters {
+  sectors: string[]
+  ranges: Record<RangeFilterKey, RangeValue>
+  sma20: SmaFilterValue
+  sma50: SmaFilterValue
+  sma200: SmaFilterValue
+}
+
+function createEmptyFilters(): AdvancedFilters {
+  return {
+    sectors: [],
+    ranges: Object.fromEntries(RANGE_FILTER_DEFS.map(d => [d.key, { min: '', max: '' }])) as Record<RangeFilterKey, RangeValue>,
+    sma20: 'any',
+    sma50: 'any',
+    sma200: 'any',
+  }
+}
+
+function countActiveFilters(f: AdvancedFilters): number {
+  const rangeCount = RANGE_FILTER_DEFS.filter(d => f.ranges[d.key].min !== '' || f.ranges[d.key].max !== '').length
+  const smaCount = [f.sma20, f.sma50, f.sma200].filter(v => v !== 'any').length
+  return f.sectors.length + rangeCount + smaCount
+}
+
+function passesFilters(s: Stock, f: AdvancedFilters): boolean {
+  if (f.sectors.length && !f.sectors.includes(s.sector)) return false
+  for (const def of RANGE_FILTER_DEFS) {
+    const { min, max } = f.ranges[def.key]
+    const v = def.getValue(s)
+    if (min !== '' && v < parseFloat(min)) return false
+    if (max !== '' && v > parseFloat(max)) return false
+  }
+  if (f.sma20 !== 'any' && s.sma20 !== f.sma20) return false
+  if (f.sma50 !== 'any' && s.sma50 !== f.sma50) return false
+  if (f.sma200 !== 'any' && s.sma200 !== f.sma200) return false
+  return true
+}
+
 // ── Theme tokens ──────────────────────────────────────────────────────────
 const THEMES = {
   dark: {
@@ -177,6 +240,53 @@ function SMABadge({ dir }: { dir: 'up' | 'down' }) {
   )
 }
 
+function RangeRow({ def, value, onChange, t }: {
+  def: RangeFilterDef
+  value: RangeValue
+  onChange: (v: RangeValue) => void
+  t: Theme
+}) {
+  const inputStyle = {
+    width: 56, background: t.inputBg, border: `1px solid ${t.borderControl}`,
+    borderRadius: 5, color: t.textPrimary, fontSize: 11, padding: '3px 5px', outline: 'none',
+  }
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: t.textSecondary, marginBottom: 3 }}>{def.label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <input type="number" placeholder="Min" value={value.min}
+          onChange={e => onChange({ ...value, min: e.target.value })} style={inputStyle} />
+        <span style={{ color: t.textMuted, fontSize: 10 }}>–</span>
+        <input type="number" placeholder="Max" value={value.max}
+          onChange={e => onChange({ ...value, max: e.target.value })} style={inputStyle} />
+      </div>
+    </div>
+  )
+}
+
+function SmaFilterRow({ label, value, onChange, t }: {
+  label: string
+  value: SmaFilterValue
+  onChange: (v: SmaFilterValue) => void
+  t: Theme
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ fontSize: 11, color: t.textSecondary }}>{label}</span>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {(['any', 'up', 'down'] as const).map(opt => (
+          <button key={opt} onClick={() => onChange(opt)} style={{
+            padding: '3px 9px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+            border: 'none', cursor: 'pointer', textTransform: 'capitalize',
+            background: value === opt ? t.borderControl : t.inputBg,
+            color: value === opt ? t.textPrimary : t.textMuted,
+          }}>{opt}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
   // AI Cake sectors
   'Semiconductors':        { bg: 'rgba(144,205,244,0.15)', fg: '#90cdf4' },
@@ -278,6 +388,8 @@ export function StockDashboard() {
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
   const [selectedDate, setSelectedDate] = useState(initialUrlState.date)
   const [favoritesByList, setFavoritesByList] = useState<Record<string, string[]>>(loadFavorites)
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(createEmptyFilters)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoritesByList))
@@ -338,6 +450,25 @@ export function StockDashboard() {
     return getHistoricalStocks(sourceStocks, new Date(selectedDate + 'T12:00:00Z'))
   }, [selectedDate, isHistorical, sourceStocks])
 
+  const availableSectors = useMemo(
+    () => [...new Set(sourceStocks.map(s => s.sector))].sort(),
+    [sourceStocks]
+  )
+  const activeFilterCount = countActiveFilters(advancedFilters)
+
+  function updateRange(key: RangeFilterKey, value: RangeValue) {
+    setAdvancedFilters(prev => ({ ...prev, ranges: { ...prev.ranges, [key]: value } }))
+  }
+
+  function toggleSector(sector: string) {
+    setAdvancedFilters(prev => ({
+      ...prev,
+      sectors: prev.sectors.includes(sector)
+        ? prev.sectors.filter(s => s !== sector)
+        : [...prev.sectors, sector],
+    }))
+  }
+
   const sorted = useMemo(() => {
     let list = [...baseStocks]
     if (search) {
@@ -346,6 +477,7 @@ export function StockDashboard() {
     }
     if (filter === 'positive') list = list.filter(s => s.pctYTD >= 0)
     if (filter === 'negative') list = list.filter(s => s.pctYTD < 0)
+    if (activeFilterCount > 0) list = list.filter(s => passesFilters(s, advancedFilters))
 
     list.sort((a, b) => {
       // Market cap is a display string ("$254.2B") — compare numerically,
@@ -358,7 +490,7 @@ export function StockDashboard() {
       return 0
     })
     return list
-  }, [sortKey, sortDir, search, filter, baseStocks, favorites])
+  }, [sortKey, sortDir, search, filter, baseStocks, favorites, activeFilterCount, advancedFilters])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -423,6 +555,7 @@ export function StockDashboard() {
             setStockListId(e.target.value as StockListId)
             setSearch('')
             setFilter('all')
+            setAdvancedFilters(createEmptyFilters())
           }}
           style={{
             backgroundColor: t.inputBg,
@@ -470,6 +603,117 @@ export function StockDashboard() {
             {f === 'all' ? 'All' : f === 'positive' ? '▲ Winners' : '▼ Losers'}
           </button>
         ))}
+
+        {/* Custom column filters */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setFilterPanelOpen(o => !o)}
+            style={{
+              padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', letterSpacing: '0.04em',
+              border: `1px solid ${activeFilterCount > 0 ? '#2b6cb0' : t.borderControl}`,
+              background: activeFilterCount > 0 ? 'rgba(66,153,225,0.15)' : t.inputBg,
+              color: activeFilterCount > 0 ? '#4299e1' : t.textSecondary,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            ⚙ Filters
+            {activeFilterCount > 0 && (
+              <span style={{
+                background: '#4299e1', color: '#0a0a0f', borderRadius: 10,
+                fontSize: 10, fontWeight: 800, minWidth: 16, height: 16,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+              }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {filterPanelOpen && (
+            <>
+              <div
+                onClick={() => setFilterPanelOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+              />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 20,
+                width: 360, maxHeight: 480, overflowY: 'auto',
+                background: t.panelBg, border: `1px solid ${t.borderOuter}`,
+                borderRadius: 12, padding: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+                textAlign: 'left',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: t.textPrimary }}>Custom Filters</span>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={() => setAdvancedFilters(createEmptyFilters())}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53e3e', fontSize: 11, fontWeight: 600 }}
+                      >
+                        Clear all
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setFilterPanelOpen(false)}
+                      aria-label="Close filters"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 14, lineHeight: 1 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sector */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: t.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Sector
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {availableSectors.map(sector => {
+                      const active = advancedFilters.sectors.includes(sector)
+                      return (
+                        <button key={sector} onClick={() => toggleSector(sector)} style={{
+                          padding: '3px 9px', borderRadius: 6, fontSize: 10.5, fontWeight: 500,
+                          border: 'none', cursor: 'pointer',
+                          background: active ? SECTOR_PALETTE[sector]?.bg ?? 'rgba(160,174,192,0.2)' : t.inputBg,
+                          color: active ? ink(SECTOR_PALETTE[sector]?.fg ?? '#a0aec0') : t.textMuted,
+                        }}>
+                          {sector}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Numeric ranges */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14,
+                }}>
+                  {RANGE_FILTER_DEFS.map(def => (
+                    <RangeRow
+                      key={def.key}
+                      def={def}
+                      value={advancedFilters.ranges[def.key]}
+                      onChange={v => updateRange(def.key, v)}
+                      t={t}
+                    />
+                  ))}
+                </div>
+
+                {/* SMA direction */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 10, color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Moving Averages
+                  </div>
+                  <SmaFilterRow label="20-Day SMA" value={advancedFilters.sma20} onChange={v => setAdvancedFilters(prev => ({ ...prev, sma20: v }))} t={t} />
+                  <SmaFilterRow label="50-Day SMA" value={advancedFilters.sma50} onChange={v => setAdvancedFilters(prev => ({ ...prev, sma50: v }))} t={t} />
+                  <SmaFilterRow label="200-Day SMA" value={advancedFilters.sma200} onChange={v => setAdvancedFilters(prev => ({ ...prev, sma200: v }))} t={t} />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <span style={{ color: t.textMuted, fontSize: 12, marginLeft: 4 }}>
           {sorted.length} stocks
         </span>
