@@ -13,6 +13,7 @@ import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
 import { downloadIcsEvent } from '../utils/ics'
+import { getNewsLinks } from '../utils/newsLinks'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
@@ -75,6 +76,10 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   const nextEarningsDate = useMemo(
     () => stock ? estimateNextEarningsDate(stock.ticker, earningsDates) : undefined,
     [stock, earningsDates]
+  )
+  const newsLinks = useMemo(
+    () => stock ? getNewsLinks(stock.ticker, stock.company) : [],
+    [stock]
   )
 
   const [range, setRange] = useState<RangeLabel>('1Y')
@@ -332,6 +337,40 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
         <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
           Chart data is synthetic — calibrated to this app's mock price and 1Y return, not real market history.
         </p>
+
+        {/* News links */}
+        <div style={{ marginTop: 28 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary, marginBottom: 10 }}>
+            Related News
+          </h2>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8,
+          }}>
+            {newsLinks.map(link => (
+              <a
+                key={link.source}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block', padding: '10px 12px', borderRadius: 8,
+                  background: t.panelBg, border: `1px solid ${t.borderOuter}`,
+                  color: t.textSecondary, fontSize: 12, textDecoration: 'none',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = t.borderControl)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = t.borderOuter)}
+              >
+                <span style={{ fontWeight: 700, color: t.textPrimary }}>{link.source}</span>
+                <span style={{ display: 'block', marginTop: 2, color: t.textMuted }}>
+                  Latest news on {stock.company} ({stock.ticker}) ↗
+                </span>
+              </a>
+            ))}
+          </div>
+          <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
+            This app has no live news feed — these link out to each site's real, ticker-specific news page.
+          </p>
+        </div>
       </div>
     </div>
   )
