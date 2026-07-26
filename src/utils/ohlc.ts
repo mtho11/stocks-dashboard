@@ -85,3 +85,21 @@ export function generateYearOhlc(ticker: string, endPrice: number, pct1Y: number
   }
   return bars
 }
+
+const EARNINGS_INTERVAL = 63 // ~1 trading quarter
+const EARNINGS_JITTER = 4 // days either side, so releases don't fall on the same weekday every quarter
+
+// Deterministic quarterly earnings-release dates within the given bar range,
+// seeded independently of the price walk so tweaking volatility doesn't
+// reshuffle earnings dates and vice versa.
+export function generateEarningsDates(ticker: string, bars: OhlcBar[]): string[] {
+  if (bars.length === 0) return []
+  const rng = mulberry32(tickerSeed(ticker) ^ 0x1234)
+  const dates: string[] = []
+  let idx = bars.length - 1 - Math.floor(rng() * 10)
+  while (idx >= 0) {
+    dates.push(bars[idx].time)
+    idx -= EARNINGS_INTERVAL + Math.round((rng() - 0.5) * EARNINGS_JITTER * 2)
+  }
+  return dates.reverse()
+}

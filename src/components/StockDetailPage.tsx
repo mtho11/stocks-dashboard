@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   createChart,
+  createSeriesMarkers,
   CandlestickSeries,
   LineSeries,
   type IChartApi,
   type ISeriesApi,
 } from 'lightweight-charts'
 import { ALL_STOCKS_BY_TICKER } from '../data/allStocks'
-import { generateYearOhlc } from '../utils/ohlc'
+import { generateYearOhlc, generateEarningsDates } from '../utils/ohlc'
 import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
@@ -83,6 +84,15 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       wickUpColor: '#48bb78', wickDownColor: '#e53e3e',
     }, 0)
     candleSeries.setData(bars)
+
+    const earningsDates = generateEarningsDates(stock.ticker, bars)
+    createSeriesMarkers(candleSeries, earningsDates.map(time => ({
+      time,
+      position: 'aboveBar',
+      shape: 'arrowDown',
+      color: '#ecc94b',
+      text: 'E',
+    })))
 
     function lineOn(values: (number | undefined)[], color: string, lineWidth: 1 | 2 | 3, dashed = false) {
       const series = chart.addSeries(LineSeries, {
@@ -210,6 +220,10 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
           <LegendItem color="#ed8936" label="200-Day MA" />
           <LegendItem color="#a78bfa" label={`Bollinger (${BOLL_PERIOD}d, ${BOLL_STDDEV}σ)`} />
           <LegendItem color="#f6ad55" label={`RSI(${RSI_PERIOD})`} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#ecc94b', fontSize: 13, lineHeight: 1 }}>▼</span>
+            Earnings release
+          </span>
         </div>
 
         {/* Chart */}
