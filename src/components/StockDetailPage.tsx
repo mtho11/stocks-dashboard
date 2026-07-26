@@ -88,6 +88,28 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     [stock]
   )
 
+  // Day/week/month/2Y are derived from the bar series (not in the Stock
+  // type); YTD/1Y reuse the stock's own fields so they match the number
+  // already shown elsewhere on this page and in the dashboard table.
+  const priceChanges = useMemo(() => {
+    if (!stock || bars.length === 0) return undefined
+    const closes = bars.map(b => b.close)
+    const last = closes[closes.length - 1]
+    const changeOverTradingDays = (n: number): number | undefined => {
+      const i = closes.length - 1 - n
+      if (i < 0 || closes[i] <= 0) return undefined
+      return ((last - closes[i]) / closes[i]) * 100
+    }
+    return {
+      d: changeOverTradingDays(1),
+      w: changeOverTradingDays(5),
+      m: changeOverTradingDays(21),
+      ytd: stock.pctYTD,
+      y: stock.pct1Y,
+      y2: changeOverTradingDays(TRADING_DAYS_PER_YEAR * 2),
+    }
+  }, [stock, bars])
+
   // Keyed by ticker (rather than reset synchronously in the effect body) so
   // switching stocks shows "loading" during render — derived below — until
   // the fetch for that specific ticker resolves.
@@ -321,6 +343,38 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
             </button>
           </div>
         </div>
+
+        {/* Performance */}
+        {priceChanges && (
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 10,
+            marginBottom: 20,
+          }}>
+            {([
+              ['1D', priceChanges.d],
+              ['1W', priceChanges.w],
+              ['1M', priceChanges.m],
+              ['YTD', priceChanges.ytd],
+              ['1Y', priceChanges.y],
+              ['2Y', priceChanges.y2],
+            ] as const).map(([label, value]) => (
+              <div key={label} style={{
+                background: t.panelBg, border: `1px solid ${t.borderOuter}`, borderRadius: 10,
+                padding: '10px 12px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 10, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  {label}
+                </div>
+                <div style={{
+                  fontSize: 16, fontWeight: 800,
+                  color: value === undefined ? t.textMuted : value >= 0 ? '#38a169' : '#e53e3e',
+                }}>
+                  {value === undefined ? 'n/a' : fmtPct(value)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Range buttons */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
