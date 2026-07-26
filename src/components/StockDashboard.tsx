@@ -7,6 +7,7 @@ import { finance } from '../data/finance'
 import { oil } from '../data/oil'
 import { healthcare } from '../data/healthcare'
 import { biotech } from '../data/biotech'
+import { ALL_STOCKS_BY_TICKER, ALL_TICKERS } from '../data/allStocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
@@ -32,18 +33,6 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'healthcare':{ stocks: healthcare,   title: 'Healthcare' },
   'biotech':   { stocks: biotech,      title: 'Biotech' },
 }
-
-// Every stock across the built-in lists, keyed by ticker — lets a custom
-// list pull any stock regardless of which built-in list it "lives" in.
-// First list wins on overlap; the shared tickers were kept numerically
-// consistent across files anyway.
-const ALL_STOCKS_BY_TICKER: Record<string, Stock> = {}
-for (const list of [aiCakeStocks, nasdaq100, sp500, dji, finance, oil, healthcare, biotech]) {
-  for (const s of list) {
-    if (!(s.ticker in ALL_STOCKS_BY_TICKER)) ALL_STOCKS_BY_TICKER[s.ticker] = s
-  }
-}
-const ALL_TICKERS = Object.keys(ALL_STOCKS_BY_TICKER).sort()
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
 const MIN_DATE = '2024-01-01'
@@ -1135,10 +1124,19 @@ export function StockDashboard() {
 
                   {/* Ticker */}
                   <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
-                    <span style={{
-                      fontWeight: 700, fontSize: 11.5,
-                      color: ink('#90cdf4'), letterSpacing: '0.03em',
-                    }}>{s.ticker}</span>
+                    <button
+                      onClick={() => navigateTo(`${BASE_PATH}stock/${s.ticker}`)}
+                      style={{
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        fontWeight: 700, fontSize: 11.5,
+                        color: ink('#90cdf4'), letterSpacing: '0.03em',
+                        textDecoration: 'underline', textDecorationColor: 'transparent',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.textDecorationColor = 'currentcolor')}
+                      onMouseLeave={e => (e.currentTarget.style.textDecorationColor = 'transparent')}
+                    >
+                      {s.ticker}
+                    </button>
                   </td>
 
                   {/* Company */}

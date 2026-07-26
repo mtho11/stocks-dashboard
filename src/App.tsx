@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { StockDashboard } from './components/StockDashboard'
 import { AboutPage } from './components/AboutPage'
+import { StockDetailPage } from './components/StockDetailPage'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
-function isAboutPath(pathname: string): boolean {
-  const rel = pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) : pathname.replace(/^\//, '')
-  return rel === 'about' || rel === 'about/'
+function relPath(pathname: string): string {
+  return pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) : pathname.replace(/^\//, '')
 }
 
 export default function App() {
@@ -18,5 +18,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  return isAboutPath(pathname) ? <AboutPage /> : <StockDashboard />
+  const rel = relPath(pathname)
+
+  if (rel === 'about' || rel === 'about/') return <AboutPage />
+
+  const stockMatch = rel.match(/^stock\/([A-Za-z.]+)\/?$/)
+  if (stockMatch) return <StockDetailPage ticker={stockMatch[1].toUpperCase()} />
+
+  return <StockDashboard />
 }
