@@ -8,7 +8,7 @@ import {
   type ISeriesApi,
 } from 'lightweight-charts'
 import { ALL_STOCKS_BY_TICKER } from '../data/allStocks'
-import { generateYearOhlc, generateEarningsDates } from '../utils/ohlc'
+import { generateOhlcHistory, generateEarningsDates } from '../utils/ohlc'
 import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
@@ -18,6 +18,18 @@ const BASE_PATH = import.meta.env.BASE_URL
 const BOLL_PERIOD = 10
 const BOLL_STDDEV = 1.8
 const RSI_PERIOD = 10
+
+const TRADING_DAYS_PER_YEAR = 252
+const RANGE_OPTIONS = [
+  { label: '1M', days: 21 },
+  { label: '3M', days: 63 },
+  { label: '6M', days: 126 },
+  { label: '1Y', days: TRADING_DAYS_PER_YEAR },
+  { label: '2Y', days: TRADING_DAYS_PER_YEAR * 2 },
+  { label: '3Y', days: TRADING_DAYS_PER_YEAR * 3 },
+  { label: '5Y', days: TRADING_DAYS_PER_YEAR * 5 },
+] as const
+type RangeLabel = (typeof RANGE_OPTIONS)[number]['label']
 
 function fmt(n: number, decimals = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -45,13 +57,28 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     document.title = stock ? `${stock.ticker} — ${stock.company}` : 'Stock not found'
   }, [stock])
 
+  const [range, setRange] = useState<RangeLabel>('1Y')
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const barCountRef = useRef(0)
+
+  function applyRange(label: RangeLabel) {
+    setRange(label)
+    const chart = chartRef.current
+    const total = barCountRef.current
+    if (!chart || !total) return
+    const opt = RANGE_OPTIONS.find(o => o.label === label)!
+    chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, total - opt.days),
+      to: total - 1 + 2,
+    })
+  }
 
   useEffect(() => {
     if (!stock || !chartContainerRef.current) return
 
-    const bars = generateYearOhlc(stock.ticker, stock.price, stock.pct1Y, new Date())
+    const bars = generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date())
+    barCountRef.current = bars.length
     const closes = bars.map(b => b.close)
     const ma50 = sma(closes, 50)
     const ma200 = sma(closes, 200)
@@ -133,7 +160,15 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     const panes = chart.panes()
     if (panes[1]) panes[1].setHeight(140)
 
-    chart.timeScale().fitContent()
+    // Default view on (re)mount — matches the initial `range` state below;
+    // range-button clicks afterward adjust the same chart instance directly
+    // via applyRange() rather than re-running this whole effect.
+    setRange('1Y')
+    const defaultOpt = RANGE_OPTIONS.find(o => o.label === '1Y')!
+    chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, bars.length - defaultOpt.days),
+      to: bars.length - 1 + 2,
+    })
 
     return () => {
       chart.remove()
@@ -212,6 +247,24 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
               {isDark ? '☀️' : '🌙'}
             </button>
           </div>
+        </div>
+
+        {/* Range buttons */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {RANGE_OPTIONS.map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => applyRange(opt.label)}
+              style={{
+                padding: '5px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', border: 'none',
+                background: range === opt.label ? t.borderControl : t.inputBg,
+                color: range === opt.label ? t.textPrimary : t.textSecondary,
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
         {/* Legend */}

@@ -8,7 +8,9 @@ export interface OhlcBar {
   close: number
 }
 
-const TRADING_DAYS = 260 // ~1 trading year
+const TRADING_DAYS_PER_YEAR = 252
+const HISTORY_YEARS = 5
+const TRADING_DAYS = TRADING_DAYS_PER_YEAR * HISTORY_YEARS // enough for the longest range button (5Y)
 
 function tickerSeed(ticker: string): number {
   return ticker.split('').reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 13), 0)
@@ -31,14 +33,21 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-// Generates a deterministic ~1-year daily OHLC series ending at `endPrice`
-// on `endDate` (weekends skipped, like real trading days). The mock dataset
-// has no genuine historical price series, so this derives one that's
-// calibrated to land on the stock's actual current price and drift at
-// roughly its headline 1Y return — seeded by ticker + end date, so reloading
-// the page (or picking the same historical date again) reproduces the same
-// candles instead of a new random walk each time.
-export function generateYearOhlc(ticker: string, endPrice: number, pct1Y: number, endDate: Date): OhlcBar[] {
+// Generates a deterministic ~5-year daily OHLC series ending at `endPrice`
+// on `endDate` (weekends skipped, like real trading days), long enough to
+// back every range button up to 5Y. The mock dataset has no genuine
+// historical price series, so this derives one that's calibrated to land on
+// the stock's actual current price and drift at roughly its headline 1Y
+// return for the most recent year — seeded by ticker + end date, so
+// reloading the page (or picking the same historical date again) reproduces
+// the same candles instead of a new random walk each time.
+//
+// Years further back are damped toward a milder rate than the raw 1Y
+// return: compounding a stock's actual trailing-year return (which can be
+// triple digits) across 5 years would send the 5-years-ago price to an
+// absurd extreme, so older history uses a moderated version of the same
+// direction instead.
+export function generateOhlcHistory(ticker: string, endPrice: number, pct1Y: number, endDate: Date): OhlcBar[] {
   const end = new Date(endDate)
   while (isWeekend(end)) end.setUTCDate(end.getUTCDate() - 1)
 
@@ -52,7 +61,9 @@ export function generateYearOhlc(ticker: string, endPrice: number, pct1Y: number
 
   const rng = mulberry32(tickerSeed(ticker) ^ dateSeed(end))
   const annualRate = pct1Y / 100
-  const dailyDrift = Math.pow(1 + annualRate, 1 / TRADING_DAYS) - 1
+  const dampedRate = Math.max(-0.6, Math.min(1.2, annualRate)) * 0.35
+  const dailyDriftRecent = Math.pow(1 + annualRate, 1 / TRADING_DAYS_PER_YEAR) - 1
+  const dailyDriftOlder = Math.pow(1 + dampedRate, 1 / TRADING_DAYS_PER_YEAR) - 1
   const dailyVol = 0.014 + rng() * 0.012
 
   // Walk backward from the known end price so the series lands exactly on
@@ -60,14 +71,16 @@ export function generateYearOhlc(ticker: string, endPrice: number, pct1Y: number
   const closes = new Array<number>(TRADING_DAYS)
   closes[TRADING_DAYS - 1] = endPrice
   for (let i = TRADING_DAYS - 2; i >= 0; i--) {
+    const inRecentYear = i + 1 >= TRADING_DAYS - TRADING_DAYS_PER_YEAR
+    const drift = inRecentYear ? dailyDriftRecent : dailyDriftOlder
     const shock = (rng() - 0.5) * 2 * dailyVol
-    closes[i] = Math.max(0.05, closes[i + 1] / (1 + dailyDrift + shock))
+    closes[i] = Math.max(0.05, closes[i + 1] / (1 + drift + shock))
   }
 
   const bars: OhlcBar[] = []
   for (let i = 0; i < TRADING_DAYS; i++) {
     const close = closes[i]
-    const prevClose = i === 0 ? close / (1 + dailyDrift) : closes[i - 1]
+    const prevClose = i === 0 ? close / (1 + dailyDriftOlder) : closes[i - 1]
     const gapPct = (rng() - 0.5) * dailyVol * 0.5
     const open = Math.max(0.05, prevClose * (1 + gapPct))
     const hi = Math.max(open, close)
