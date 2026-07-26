@@ -33,6 +33,19 @@ const RANGE_OPTIONS = [
   { label: '5Y', days: TRADING_DAYS_PER_YEAR * 5 },
 ] as const
 type RangeLabel = (typeof RANGE_OPTIONS)[number]['label']
+const DEFAULT_RANGE: RangeLabel = '1Y'
+
+function isRangeLabel(v: string | null): v is RangeLabel {
+  return !!v && (RANGE_OPTIONS as readonly { label: string }[]).some(o => o.label === v)
+}
+
+// The chart's date range lives in `?range=` so a view like
+// /stock/AAPL?range=5Y is bookmarkable/shareable on its own.
+function parseRangeFromUrl(): RangeLabel {
+  if (typeof window === 'undefined') return DEFAULT_RANGE
+  const param = new URLSearchParams(window.location.search).get('range')
+  return isRangeLabel(param) ? param : DEFAULT_RANGE
+}
 
 function fmt(n: number, decimals = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -130,7 +143,22 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     ? newsResult
     : { status: 'loading' as const, items: [] as NewsHeadline[] }
 
-  const [range, setRange] = useState<RangeLabel>('1Y')
+  const [range, setRange] = useState<RangeLabel>(parseRangeFromUrl)
+  // Mirrors `range` for the chart-mount effect below (which only wants the
+  // latest value when it rebuilds the chart, not a reason to re-run itself
+  // on every button click — that would recreate every series each time).
+  const rangeRef = useRef(range)
+  useEffect(() => { rangeRef.current = range }, [range])
+
+  // Keeps ?range= in the URL in sync (replaceState, like the dashboard's
+  // list+date sync) so the current view is bookmarkable/shareable.
+  useEffect(() => {
+    if (!stock) return
+    const url = new URL(window.location.href)
+    url.searchParams.set('range', range)
+    window.history.replaceState(null, '', url.pathname + url.search)
+  }, [stock, range])
+
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const barCountRef = useRef(0)
@@ -231,13 +259,13 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     const panes = chart.panes()
     if (panes[1]) panes[1].setHeight(140)
 
-    // Default view on (re)mount — matches the initial `range` state below;
-    // range-button clicks afterward adjust the same chart instance directly
-    // via applyRange() rather than re-running this whole effect.
-    setRange('1Y')
-    const defaultOpt = RANGE_OPTIONS.find(o => o.label === '1Y')!
+    // View on (re)mount/rebuild — whatever range is currently selected
+    // (from the URL on first mount, or preserved across a theme-triggered
+    // rebuild). Range-button clicks afterward adjust the same chart
+    // instance directly via applyRange() rather than re-running this effect.
+    const currentOpt = RANGE_OPTIONS.find(o => o.label === rangeRef.current) ?? RANGE_OPTIONS[3]
     chart.timeScale().setVisibleLogicalRange({
-      from: Math.max(0, bars.length - defaultOpt.days),
+      from: Math.max(0, bars.length - currentOpt.days),
       to: bars.length - 1 + 2,
     })
 

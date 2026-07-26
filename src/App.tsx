@@ -23,7 +23,12 @@ export default function App() {
   if (rel === 'about' || rel === 'about/') return <AboutPage />
 
   const stockMatch = rel.match(/^stock\/([A-Za-z.]+)\/?$/)
-  if (stockMatch) return <StockDetailPage ticker={stockMatch[1].toUpperCase()} />
+  if (stockMatch) {
+    const ticker = stockMatch[1].toUpperCase()
+    // key forces a fresh mount per ticker so lazy state (e.g. the initial
+    // ?range= read) re-reads the URL instead of reusing the prior ticker's.
+    return <StockDetailPage key={ticker} ticker={ticker} />
+  }
 
   return <StockDashboard />
 }
