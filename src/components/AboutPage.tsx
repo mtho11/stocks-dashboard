@@ -68,26 +68,32 @@ const STEPS: Step[] = [
   },
   {
     title: '11. Hover a column header for context',
+    image: '12-column-tooltip.svg',
     body: 'Hold your mouse over any column header — P/S, RS Rank, RSI(14), Δ Highs, any of the SMA columns — for about three-quarters of a second and a tooltip explains what that column means. Move away before then and nothing pops up, so quick passes over the header row stay quiet.',
   },
   {
     title: '12. Open a stock\'s detail chart',
+    image: '13-open-detail-page.svg',
     body: 'Click any ticker in the table to open a dedicated page for that stock, with a full price chart and deeper stats than the table alone shows.',
   },
   {
     title: '13. Read the price chart',
+    image: '14-price-chart.svg',
     body: 'The chart plots daily candlesticks with a 50-day and 200-day moving average, Bollinger Bands (10-day, 1.8 standard deviations), and small arrow markers over each quarterly earnings release. A separate pane below tracks 10-day RSI with overbought/oversold reference lines.',
   },
   {
     title: '14. Zoom the timeframe',
+    image: '15-range-buttons.svg',
     body: 'The 1M / 3M / 6M / 1Y / 2Y / 3Y / 5Y buttons above the chart rescale it to that window without reloading the page or losing your place.',
   },
   {
     title: '15. Track the next earnings date',
+    image: '16-earnings-calendar.svg',
     body: 'Next to the company name, the page shows an estimated date for the next earnings release, with a "+ Add to calendar" button that downloads a ready-to-import .ics file for it.',
   },
   {
     title: '16. Check performance at a glance',
+    image: '17-performance-summary.svg',
     body: 'A row of stat tiles above the chart summarizes percent change over 1 day, 1 week, 1 month, year-to-date, 1 year, and 2 years — color-coded green or red.',
   },
 ]

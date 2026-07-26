@@ -1,0 +1,33 @@
+<svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" font-family="Inter, -apple-system, sans-serif">
+  <rect width="800" height="200" fill="#0d1117"/>
+
+  <!-- left: table row with clickable ticker -->
+  <g transform="translate(30,60)">
+    <rect x="0" y="0" width="300" height="80" rx="10" fill="#0f1419" stroke="#1a202c"/>
+    <text x="20" y="30" fill="#90cdf4" font-size="16" font-weight="800" text-decoration="underline">AAPL</text>
+    <text x="20" y="52" fill="#718096" font-size="12">Apple</text>
+    <text x="220" y="30" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="end">$228.52</text>
+    <text x="270" y="52" fill="#48bb78" font-size="11" text-anchor="end">+38.70%</text>
+    <rect x="0" y="0" width="300" height="80" rx="10" fill="none" stroke="#4299e1" stroke-width="1.5" stroke-dasharray="4 3"/>
+  </g>
+
+  <!-- arrow -->
+  <g stroke="#718096" stroke-width="2" fill="none">
+    <line x1="345" y1="100" x2="420" y2="100"/>
+    <polygon points="420,100 408,94 408,106" fill="#718096"/>
+  </g>
+
+  <!-- right: mini detail page mockup -->
+  <g transform="translate(440,40)">
+    <rect x="0" y="0" width="330" height="130" rx="10" fill="#0f1419" stroke="#1a202c"/>
+    <text x="18" y="26" fill="#e2e8f0" font-size="15" font-weight="800">AAPL</text>
+    <text x="70" y="26" fill="#718096" font-size="12">Apple</text>
+    <polyline points="18,95 45,80 72,88 99,65 126,70 153,50 180,58 207,42 234,48 261,30 288,38 312,25"
+      fill="none" stroke="#48bb78" stroke-width="2"/>
+    <rect x="14" y="105" width="30" height="14" fill="none" stroke="#e53e3e" stroke-width="1.2"/>
+    <rect x="55" y="108" width="30" height="9" fill="none" stroke="#48bb78" stroke-width="1.2"/>
+    <rect x="96" y="100" width="30" height="18" fill="none" stroke="#48bb78" stroke-width="1.2"/>
+  </g>
+
+  <text x="400" y="185" fill="#4a5568" font-size="11" text-anchor="middle">Click a ticker → full detail page</text>
+</svg>

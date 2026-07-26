@@ -1,0 +1,33 @@
+<svg viewBox="0 0 800 160" xmlns="http://www.w3.org/2000/svg" font-family="Inter, -apple-system, sans-serif">
+  <rect width="800" height="160" fill="#0d1117"/>
+
+  <g transform="translate(30,50)">
+    <!-- inactive buttons -->
+    <g font-size="13" font-weight="700">
+      <rect x="0"   y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="30"  y="20" fill="#718096" text-anchor="middle">1M</text>
+      <rect x="70"  y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="100" y="20" fill="#718096" text-anchor="middle">3M</text>
+      <rect x="140" y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="170" y="20" fill="#718096" text-anchor="middle">6M</text>
+
+      <!-- active -->
+      <rect x="210" y="0" width="60" height="30" rx="7" fill="#2d3748"/>
+      <text x="240" y="20" fill="#e2e8f0" text-anchor="middle">1Y</text>
+
+      <rect x="280" y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="310" y="20" fill="#718096" text-anchor="middle">2Y</text>
+      <rect x="350" y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="380" y="20" fill="#718096" text-anchor="middle">3Y</text>
+      <rect x="420" y="0" width="60" height="30" rx="7" fill="#161b22"/>
+      <text x="450" y="20" fill="#718096" text-anchor="middle">5Y</text>
+    </g>
+  </g>
+
+  <!-- little cursor over 1Y -->
+  <g transform="translate(255,66)">
+    <path d="M0 0 L0 16 L4 12.5 L7 19 L10.5 17.5 L7.5 11 L13 11 Z" fill="#e2e8f0" stroke="#0d1117" stroke-width="0.5"/>
+  </g>
+
+  <text x="400" y="140" fill="#4a5568" font-size="11" text-anchor="middle">Rescales instantly — no reload, no lost place</text>
+</svg>
