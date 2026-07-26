@@ -116,3 +116,19 @@ export function generateEarningsDates(ticker: string, bars: OhlcBar[]): string[]
   }
   return dates.reverse()
 }
+
+// The next estimated release, continuing the same quarterly cadence one
+// step past the most recent known date — same seed family as
+// generateEarningsDates (offset so it doesn't reproduce the same jitter
+// draw), so it's stable across reloads without being a plain fixed interval.
+export function estimateNextEarningsDate(ticker: string, pastDates: string[]): string | undefined {
+  if (pastDates.length === 0) return undefined
+  const rng = mulberry32(tickerSeed(ticker) ^ 0x1234 ^ 0x5a5a)
+  const last = new Date(`${pastDates[pastDates.length - 1]}T00:00:00Z`)
+  const calendarDaysPerQuarter = 91
+  const jitter = Math.round((rng() - 0.5) * EARNINGS_JITTER * 2)
+  const next = new Date(last)
+  next.setUTCDate(next.getUTCDate() + calendarDaysPerQuarter + jitter)
+  while (isWeekend(next)) next.setUTCDate(next.getUTCDate() + 1)
+  return toDateStr(next)
+}

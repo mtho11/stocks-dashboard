@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createChart,
   createSeriesMarkers,
@@ -8,10 +8,11 @@ import {
   type ISeriesApi,
 } from 'lightweight-charts'
 import { ALL_STOCKS_BY_TICKER } from '../data/allStocks'
-import { generateOhlcHistory, generateEarningsDates } from '../utils/ohlc'
+import { generateOhlcHistory, generateEarningsDates, estimateNextEarningsDate } from '../utils/ohlc'
 import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
+import { downloadIcsEvent } from '../utils/ics'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
@@ -40,6 +41,12 @@ function fmtPct(n: number): string {
   return `${sign}${fmt(n)}%`
 }
 
+function formatDisplayDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`
+}
+
 export function StockDetailPage({ ticker }: { ticker: string }) {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
   const isDark = mode === 'dark'
@@ -56,6 +63,19 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   useEffect(() => {
     document.title = stock ? `${stock.ticker} — ${stock.company}` : 'Stock not found'
   }, [stock])
+
+  const bars = useMemo(
+    () => stock ? generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date()) : [],
+    [stock]
+  )
+  const earningsDates = useMemo(
+    () => stock ? generateEarningsDates(stock.ticker, bars) : [],
+    [stock, bars]
+  )
+  const nextEarningsDate = useMemo(
+    () => stock ? estimateNextEarningsDate(stock.ticker, earningsDates) : undefined,
+    [stock, earningsDates]
+  )
 
   const [range, setRange] = useState<RangeLabel>('1Y')
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -75,9 +95,8 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   }
 
   useEffect(() => {
-    if (!stock || !chartContainerRef.current) return
+    if (!stock || !chartContainerRef.current || bars.length === 0) return
 
-    const bars = generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date())
     barCountRef.current = bars.length
     const closes = bars.map(b => b.close)
     const ma50 = sma(closes, 50)
@@ -112,7 +131,6 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     }, 0)
     candleSeries.setData(bars)
 
-    const earningsDates = generateEarningsDates(stock.ticker, bars)
     createSeriesMarkers(candleSeries, earningsDates.map(time => ({
       time,
       position: 'aboveBar',
@@ -175,7 +193,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       chartRef.current = null
       void ma50Series; void ma200Series; void bollUpperSeries; void bollBasisSeries; void bollLowerSeries
     }
-  }, [stock, isDark, t])
+  }, [stock, isDark, t, bars, earningsDates])
 
   if (!stock) {
     return (
@@ -215,12 +233,36 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', color: t.textPrimary, marginBottom: 2 }}>
               {stock.ticker} <span style={{ fontWeight: 500, fontSize: 16, color: t.textMuted }}>{stock.company}</span>
             </h1>
-            <span style={{
-              display: 'inline-block', fontSize: 11, fontWeight: 500, padding: '2px 8px',
-              borderRadius: 4, background: 'rgba(160,174,192,0.15)', color: t.textSecondary,
-            }}>
-              {stock.sector}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-block', fontSize: 11, fontWeight: 500, padding: '2px 8px',
+                borderRadius: 4, background: 'rgba(160,174,192,0.15)', color: t.textSecondary,
+              }}>
+                {stock.sector}
+              </span>
+              {nextEarningsDate && (
+                <span style={{ fontSize: 12, color: t.textSecondary }}>
+                  Next earnings (est.): <strong style={{ color: t.textPrimary }}>{formatDisplayDate(nextEarningsDate)}</strong>
+                </span>
+              )}
+              {nextEarningsDate && (
+                <button
+                  onClick={() => downloadIcsEvent(
+                    `${stock.ticker}-earnings-${nextEarningsDate}.ics`,
+                    `${stock.ticker} earnings release (est.)`,
+                    nextEarningsDate,
+                    `Estimated earnings release date for ${stock.company} (${stock.ticker}).`
+                  )}
+                  style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${t.borderControl}`, background: t.inputBg,
+                    color: t.textSecondary, cursor: 'pointer',
+                  }}
+                >
+                  + Add to calendar
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
