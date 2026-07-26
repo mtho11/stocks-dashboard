@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { stocks as aiCakeStocks } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
 import { sp500 } from '../data/sp500'
@@ -188,12 +188,15 @@ function passesFilters(s: Stock, f: AdvancedFilters): boolean {
   return true
 }
 
+const TOOLTIP_DELAY_MS = 750
+
 // Top-level so its component identity is stable across renders — defining
 // it inside StockDashboard remounted every header cell on each render.
-function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
+function Th({ label, sk, right, tip, sortKey, sortDir, onSort, t, ink }: {
   label: string
   sk?: SortKey
   right?: boolean
+  tip?: string
   sortKey: SortKey
   sortDir: SortDir
   onSort: (key: SortKey) => void
@@ -201,9 +204,23 @@ function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
   ink: (hex: string) => string
 }) {
   const active = sk && sortKey === sk
+  const [showTip, setShowTip] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  function onEnter() {
+    if (!tip) return
+    timerRef.current = setTimeout(() => setShowTip(true), TOOLTIP_DELAY_MS)
+  }
+  function onLeave() {
+    clearTimeout(timerRef.current)
+    setShowTip(false)
+  }
+
   return (
     <th
       onClick={sk ? () => onSort(sk) : undefined}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
       style={{
         padding: '10px 8px',
         textAlign: right ? 'right' : 'center',
@@ -220,9 +237,22 @@ function Th({ label, sk, right, sortKey, sortDir, onSort, t, ink }: {
         position: 'sticky', top: 0, zIndex: 2,
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, position: 'relative' }}>
         {label}
         {sk && <span style={{ opacity: active ? 1 : 0.3, fontSize: 9 }}>{active && sortDir === 'asc' ? '▲' : '▼'}</span>}
+        {tip && showTip && (
+          <span style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            marginTop: 8, zIndex: 10,
+            background: t.panelBg, border: `1px solid ${t.borderOuter}`,
+            borderRadius: 8, padding: '8px 10px',
+            fontSize: 11, fontWeight: 400, textTransform: 'none', letterSpacing: 'normal',
+            color: t.textPrimary, whiteSpace: 'normal', textAlign: 'left',
+            width: 200, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', pointerEvents: 'none',
+          }}>
+            {tip}
+          </span>
+        )}
       </span>
     </th>
   )
@@ -1043,30 +1073,30 @@ export function StockDashboard() {
         }}>
           <thead>
             <tr>
-              <Th label="★" sk="favorite" {...thProps} />
-              <Th label="#" {...thProps} />
-              <Th label="Ticker" sk="ticker" {...thProps} />
-              <Th label="Company" sk="company" {...thProps} />
-              <Th label="Sector" sk="sector" {...thProps} />
-              <Th label="Price" sk="price" right {...thProps} />
-              <Th label="Mkt Cap" sk="marketCap" right {...thProps} />
-              <Th label="P/S" right {...thProps} />
-              <Th label="P/E" right {...thProps} />
-              <Th label="% YTD" sk="pctYTD" {...thProps} />
-              <Th label="% 1Y" sk="pct1Y" {...thProps} />
-              <Th label="Chart 1W" {...thProps} />
-              <Th label="Chart 1M" {...thProps} />
-              <Th label="Chart 1Y" {...thProps} />
-              <Th label="Δ Highs" sk="deltaHighs" {...thProps} />
-              <Th label="RS" sk="rsRank" {...thProps} />
-              <Th label="RSI(14)" {...thProps} />
-              <Th label="1W %" sk="ret1W" {...thProps} />
-              <Th label="1M %" sk="ret1M" {...thProps} />
-              <Th label="3M %" sk="ret3M" {...thProps} />
-              <Th label="6M %" sk="ret6M" {...thProps} />
-              <Th label="20SMA" {...thProps} />
-              <Th label="50SMA" {...thProps} />
-              <Th label="200SMA" {...thProps} />
+              <Th label="★" sk="favorite" tip="Mark this stock as a favorite for quick reference." {...thProps} />
+              <Th label="#" tip="Rank within this list, based on the current sort." {...thProps} />
+              <Th label="Ticker" sk="ticker" tip="Stock ticker symbol — click it to open a detailed price chart." {...thProps} />
+              <Th label="Company" sk="company" tip="Company name." {...thProps} />
+              <Th label="Sector" sk="sector" tip="Industry sector classification." {...thProps} />
+              <Th label="Price" sk="price" right tip="Latest share price." {...thProps} />
+              <Th label="Mkt Cap" sk="marketCap" right tip="Total market capitalization — share price × shares outstanding." {...thProps} />
+              <Th label="P/S" right tip="Price-to-sales ratio — share price divided by revenue per share." {...thProps} />
+              <Th label="P/E" right tip="Price-to-earnings ratio — share price divided by earnings per share." {...thProps} />
+              <Th label="% YTD" sk="pctYTD" tip="Percent price change since the start of the calendar year." {...thProps} />
+              <Th label="% 1Y" sk="pct1Y" tip="Percent price change over the trailing 12 months." {...thProps} />
+              <Th label="Chart 1W" tip="7-day price sparkline." {...thProps} />
+              <Th label="Chart 1M" tip="30-day price sparkline." {...thProps} />
+              <Th label="Chart 1Y" tip="1-year price sparkline." {...thProps} />
+              <Th label="Δ Highs" sk="deltaHighs" tip="Percent below the stock's 52-week high." {...thProps} />
+              <Th label="RS" sk="rsRank" tip="Relative Strength Rank — percentile performance vs. the rest of this list. Higher is stronger." {...thProps} />
+              <Th label="RSI(14)" tip="14-period Relative Strength Index — a momentum gauge. Above 70 is overbought, below 30 is oversold." {...thProps} />
+              <Th label="1W %" sk="ret1W" tip="Price return over the trailing 1 week." {...thProps} />
+              <Th label="1M %" sk="ret1M" tip="Price return over the trailing 1 month." {...thProps} />
+              <Th label="3M %" sk="ret3M" tip="Price return over the trailing 3 months." {...thProps} />
+              <Th label="6M %" sk="ret6M" tip="Price return over the trailing 6 months." {...thProps} />
+              <Th label="20SMA" tip="Whether price is trending above (▲) or below (▼) its 20-day simple moving average." {...thProps} />
+              <Th label="50SMA" tip="Whether price is trending above (▲) or below (▼) its 50-day simple moving average." {...thProps} />
+              <Th label="200SMA" tip="Whether price is trending above (▲) or below (▼) its 200-day simple moving average." {...thProps} />
             </tr>
           </thead>
           <tbody>
