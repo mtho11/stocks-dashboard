@@ -90,10 +90,6 @@ const STEPS: Step[] = [
     title: '16. Check performance at a glance',
     body: 'A row of stat tiles above the chart summarizes percent change over 1 day, 1 week, 1 month, year-to-date, 1 year, and 2 years — color-coded green or red.',
   },
-  {
-    title: '17. Read the latest headlines',
-    body: 'Below the chart, "Related News" shows the ten most recent real headlines for that company, pulled live from Google News and linking straight to the original article. If that live fetch is ever unavailable, it falls back to a set of direct links to each site\'s own news page for that ticker instead of showing nothing.',
-  },
 ]
 
 export function AboutPage() {
@@ -159,9 +155,9 @@ export function AboutPage() {
           <p style={{ color: t.textSecondary, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
             Click any ticker to open a full detail page: a candlestick chart with 50/200-day
             moving averages, Bollinger Bands, earnings-release markers, and a zoomable timeframe
-            from 1 month to 5 years; a 10-day RSI pane; an estimated next-earnings date with a
-            one-click "add to calendar" download; a 1D/1W/1M/YTD/1Y/2Y performance summary; and
-            the ten most recent real news headlines for that company.
+            from 1 month to 5 years (synced to the URL as ?range=); a 10-day RSI pane; an
+            estimated next-earnings date with a one-click "add to calendar" download; and a
+            1D/1W/1M/YTD/1Y/2Y performance summary.
           </p>
           <div style={{
             background: 'rgba(246,173,85,0.1)', border: '1px solid #744210', borderRadius: 8,

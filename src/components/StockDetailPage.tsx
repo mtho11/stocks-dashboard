@@ -13,8 +13,6 @@ import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
 import { downloadIcsEvent } from '../utils/ics'
-import { getNewsLinks } from '../utils/newsLinks'
-import { fetchStockNews, type NewsHeadline } from '../utils/googleNews'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
@@ -62,11 +60,6 @@ function formatDisplayDate(iso: string): string {
   return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`
 }
 
-function formatPubDate(rfc822: string): string {
-  const d = new Date(rfc822)
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
 export function StockDetailPage({ ticker }: { ticker: string }) {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
   const isDark = mode === 'dark'
@@ -96,11 +89,6 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     () => stock ? estimateNextEarningsDate(stock.ticker, earningsDates) : undefined,
     [stock, earningsDates]
   )
-  const newsLinks = useMemo(
-    () => stock ? getNewsLinks(stock.ticker, stock.company) : [],
-    [stock]
-  )
-
   // Day/week/month/2Y are derived from the bar series (not in the Stock
   // type); YTD/1Y reuse the stock's own fields so they match the number
   // already shown elsewhere on this page and in the dashboard table.
@@ -122,26 +110,6 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       y2: changeOverTradingDays(TRADING_DAYS_PER_YEAR * 2),
     }
   }, [stock, bars])
-
-  // Keyed by ticker (rather than reset synchronously in the effect body) so
-  // switching stocks shows "loading" during render — derived below — until
-  // the fetch for that specific ticker resolves.
-  const [newsResult, setNewsResult] = useState<
-    { ticker: string; status: 'ready' | 'error'; items: NewsHeadline[] } | undefined
-  >(undefined)
-
-  useEffect(() => {
-    if (!stock) return
-    let cancelled = false
-    fetchStockNews(stock.ticker, stock.company, 10)
-      .then(items => { if (!cancelled) setNewsResult({ ticker: stock.ticker, status: 'ready', items }) })
-      .catch(() => { if (!cancelled) setNewsResult({ ticker: stock.ticker, status: 'error', items: [] }) })
-    return () => { cancelled = true }
-  }, [stock])
-
-  const newsState = stock && newsResult?.ticker === stock.ticker
-    ? newsResult
-    : { status: 'loading' as const, items: [] as NewsHeadline[] }
 
   const [range, setRange] = useState<RangeLabel>(parseRangeFromUrl)
   // Mirrors `range` for the chart-mount effect below (which only wants the
@@ -445,80 +413,6 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
         <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
           Chart data is synthetic — calibrated to this app's mock price and 1Y return, not real market history.
         </p>
-
-        {/* News */}
-        <div style={{ marginTop: 28 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary, marginBottom: 10 }}>
-            Related News
-          </h2>
-
-          {newsState.status === 'loading' && (
-            <p style={{ color: t.textMuted, fontSize: 12 }}>Loading latest headlines…</p>
-          )}
-
-          {newsState.status === 'ready' && newsState.items.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {newsState.items.map((item, i) => (
-                <a
-                  key={i}
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'block', padding: '10px 12px', borderRadius: 8,
-                    background: t.panelBg, border: `1px solid ${t.borderOuter}`,
-                    color: t.textPrimary, fontSize: 12.5, textDecoration: 'none',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = t.borderControl)}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = t.borderOuter)}
-                >
-                  <span style={{ fontWeight: 600 }}>{item.title}</span>
-                  <span style={{ display: 'block', marginTop: 3, color: t.textMuted, fontSize: 11 }}>
-                    {item.source}{item.pubDate && ` · ${formatPubDate(item.pubDate)}`}
-                  </span>
-                </a>
-              ))}
-            </div>
-          )}
-
-          {newsState.status === 'ready' && newsState.items.length === 0 && (
-            <p style={{ color: t.textMuted, fontSize: 12 }}>No recent headlines found for {stock.ticker}.</p>
-          )}
-
-          {newsState.status === 'error' && (
-            <>
-              <p style={{ color: t.textMuted, fontSize: 12, marginBottom: 10 }}>
-                Couldn't load live headlines right now — here are direct links instead.
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
-                {newsLinks.map(link => (
-                  <a
-                    key={link.source}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'block', padding: '10px 12px', borderRadius: 8,
-                      background: t.panelBg, border: `1px solid ${t.borderOuter}`,
-                      color: t.textSecondary, fontSize: 12, textDecoration: 'none',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = t.borderControl)}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = t.borderOuter)}
-                  >
-                    <span style={{ fontWeight: 700, color: t.textPrimary }}>{link.source}</span>
-                    <span style={{ display: 'block', marginTop: 2, color: t.textMuted }}>
-                      Latest news on {stock.company} ({stock.ticker}) ↗
-                    </span>
-                  </a>
-                ))}
-              </div>
-            </>
-          )}
-
-          <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
-            Headlines via Google News — opens the original article in a new tab.
-          </p>
-        </div>
       </div>
     </div>
   )
