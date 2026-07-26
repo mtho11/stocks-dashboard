@@ -3,6 +3,10 @@ import { stocks as aiCakeStocks } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
 import { sp500 } from '../data/sp500'
 import { dji } from '../data/dji'
+import { finance } from '../data/finance'
+import { oil } from '../data/oil'
+import { healthcare } from '../data/healthcare'
+import { biotech } from '../data/biotech'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
@@ -12,17 +16,21 @@ import { parseUrlState, buildUrlPath } from '../utils/urlState'
 import { navigateTo } from '../utils/nav'
 import { THEMES, THEME_KEY, getInitialTheme, darken, type ThemeMode, type Theme } from '../utils/theme'
 
-type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji'
-const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji']
+type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech'
+const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji', 'finance', 'oil', 'healthcare', 'biotech']
 function isStockListId(v: string | undefined): v is StockListId {
   return !!v && (STOCK_LIST_IDS as string[]).includes(v)
 }
 
 const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
-  'ai-cake':  { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
-  'nasdaq100':{ stocks: nasdaq100,    title: 'Nasdaq 100' },
-  'sp500':    { stocks: sp500,        title: 'S&P 500' },
-  'dji':      { stocks: dji,          title: 'Dow Jones Industrial Average' },
+  'ai-cake':   { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
+  'nasdaq100': { stocks: nasdaq100,    title: 'Nasdaq 100' },
+  'sp500':     { stocks: sp500,        title: 'S&P 500' },
+  'dji':       { stocks: dji,          title: 'Dow Jones Industrial Average' },
+  'finance':   { stocks: finance,      title: 'Finance' },
+  'oil':       { stocks: oil,          title: 'Oil & Energy' },
+  'healthcare':{ stocks: healthcare,   title: 'Healthcare' },
+  'biotech':   { stocks: biotech,      title: 'Biotech' },
 }
 
 // Every stock across the built-in lists, keyed by ticker — lets a custom
@@ -30,7 +38,7 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
 // First list wins on overlap; the shared tickers were kept numerically
 // consistent across files anyway.
 const ALL_STOCKS_BY_TICKER: Record<string, Stock> = {}
-for (const list of [aiCakeStocks, nasdaq100, sp500, dji]) {
+for (const list of [aiCakeStocks, nasdaq100, sp500, dji, finance, oil, healthcare, biotech]) {
   for (const s of list) {
     if (!(s.ticker in ALL_STOCKS_BY_TICKER)) ALL_STOCKS_BY_TICKER[s.ticker] = s
   }
@@ -433,7 +441,7 @@ export function StockDashboard() {
     if (!ALL_STOCKS_BY_TICKER[ticker]) {
       // Previously a silent no-op — indistinguishable from the button not
       // working at all. Tell the user why instead.
-      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, or Dow 30, so it can't be added.`)
+      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, or Biotech, so it can't be added.`)
       return
     }
     setCustomLists(prev => prev.map(l =>
@@ -657,6 +665,10 @@ export function StockDashboard() {
             <option value="nasdaq100">📊 Nasdaq 100</option>
             <option value="sp500">📈 S&amp;P 500</option>
             <option value="dji">🏛 Dow 30</option>
+            <option value="finance">🏦 Finance</option>
+            <option value="oil">🛢️ Oil &amp; Energy</option>
+            <option value="healthcare">⚕️ Healthcare</option>
+            <option value="biotech">🧬 Biotech</option>
           </optgroup>
           {customLists.length > 0 && (
             <optgroup label="My Lists">
