@@ -6,7 +6,7 @@ const BASE_PATH = import.meta.env.BASE_URL
 
 interface Step {
   title: string
-  image: string
+  image?: string
   body: string
 }
 
@@ -14,7 +14,7 @@ const STEPS: Step[] = [
   {
     title: '1. Pick a stock group',
     image: '01-overview.png',
-    body: "The dropdown in the top-left switches between four built-in groups — Jensen's AI Cake (50 hand-picked AI/deep-tech names), Nasdaq 100, S&P 500, and the Dow 30 — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
+    body: "The dropdown in the top-left switches between nine built-in groups — Jensen's AI Cake (50 hand-picked AI/deep-tech names), Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, and Retail — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
   },
   {
     title: '2. Sort any column',
@@ -54,7 +54,7 @@ const STEPS: Step[] = [
   {
     title: '8. Build your own list',
     image: '09-custom-lists.png',
-    body: 'Open 📁 My Lists to create a named list and add any ticker from any of the four built-in groups — mix and match freely, e.g. an "AI Infrastructure" list pulling NVDA from one group and ALAB from another. Custom lists get their own RS Rank recalculated just for that cohort, and are saved to your browser so they’re there next time you visit.',
+    body: 'Open 📁 My Lists to create a named list and add any ticker from any of the built-in groups — mix and match freely, e.g. an "AI Infrastructure" list pulling NVDA from one group and ALAB from another. Custom lists get their own RS Rank recalculated just for that cohort, and are saved to your browser so they’re there next time you visit.',
   },
   {
     title: '9. Light or dark, your call',
@@ -65,6 +65,34 @@ const STEPS: Step[] = [
     title: '10. Read the summary row',
     image: '11-summary-cards.png',
     body: 'The footer totals market cap for whatever’s currently visible, and the cards below break down total market cap, stock count, YTD winners/losers, and what share of the group is trading above vs. below its 200-day moving average.',
+  },
+  {
+    title: '11. Hover a column header for context',
+    body: 'Hold your mouse over any column header — P/S, RS Rank, RSI(14), Δ Highs, any of the SMA columns — for about three-quarters of a second and a tooltip explains what that column means. Move away before then and nothing pops up, so quick passes over the header row stay quiet.',
+  },
+  {
+    title: '12. Open a stock\'s detail chart',
+    body: 'Click any ticker in the table to open a dedicated page for that stock, with a full price chart and deeper stats than the table alone shows.',
+  },
+  {
+    title: '13. Read the price chart',
+    body: 'The chart plots daily candlesticks with a 50-day and 200-day moving average, Bollinger Bands (10-day, 1.8 standard deviations), and small arrow markers over each quarterly earnings release. A separate pane below tracks 10-day RSI with overbought/oversold reference lines.',
+  },
+  {
+    title: '14. Zoom the timeframe',
+    body: 'The 1M / 3M / 6M / 1Y / 2Y / 3Y / 5Y buttons above the chart rescale it to that window without reloading the page or losing your place.',
+  },
+  {
+    title: '15. Track the next earnings date',
+    body: 'Next to the company name, the page shows an estimated date for the next earnings release, with a "+ Add to calendar" button that downloads a ready-to-import .ics file for it.',
+  },
+  {
+    title: '16. Check performance at a glance',
+    body: 'A row of stat tiles above the chart summarizes percent change over 1 day, 1 week, 1 month, year-to-date, 1 year, and 2 years — color-coded green or red.',
+  },
+  {
+    title: '17. Read the latest headlines',
+    body: 'Below the chart, "Related News" shows the ten most recent real headlines for that company, pulled live from Google News and linking straight to the original article. If that live fetch is ever unavailable, it falls back to a set of direct links to each site\'s own news page for that ticker instead of showing nothing.',
   },
 ]
 
@@ -113,11 +141,13 @@ export function AboutPage() {
         }}>
           <h2 style={{ color: t.textPrimary, fontSize: 18, fontWeight: 700, marginBottom: 10 }}>What this is</h2>
           <p style={{ color: t.textSecondary, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
-            Mike's Market Monitor is a stock-screening dashboard for exploring four groups of
-            stocks — an AI/deep-tech watchlist, the Nasdaq 100, the S&amp;P 500, and the Dow 30 — plus
-            any custom lists you build yourself. Every row carries price, market cap, valuation
-            ratios, three return windows of sparkline charts, momentum indicators (RSI, RS Rank),
-            moving-average direction, and period returns from 1 week out to 6 months.
+            Mike's Market Monitor is a stock-screening dashboard for exploring nine groups of
+            stocks — an AI/deep-tech watchlist, the Nasdaq 100, the S&amp;P 500, the Dow 30, Finance,
+            Oil &amp; Energy, Healthcare, Biotech, and Retail — plus any custom lists you build
+            yourself. Every row carries price, market cap, valuation ratios, three return windows
+            of sparkline charts, momentum indicators (RSI, RS Rank), moving-average direction, and
+            period returns from 1 week out to 6 months. Hover any column header for a quick
+            explanation of what it means.
           </p>
           <p style={{ color: t.textSecondary, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
             You can sort by any column, search, apply quick or advanced filters, star favorites,
@@ -125,6 +155,13 @@ export function AboutPage() {
             table to any date back to 2024 to see what it would have looked like then. Your theme,
             favorites, and custom lists are all remembered between visits, and the current view
             (stock group + date) lives in the URL so you can bookmark or share it.
+          </p>
+          <p style={{ color: t.textSecondary, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
+            Click any ticker to open a full detail page: a candlestick chart with 50/200-day
+            moving averages, Bollinger Bands, earnings-release markers, and a zoomable timeframe
+            from 1 month to 5 years; a 10-day RSI pane; an estimated next-earnings date with a
+            one-click "add to calendar" download; a 1D/1W/1M/YTD/1Y/2Y performance summary; and
+            the ten most recent real news headlines for that company.
           </p>
           <div style={{
             background: 'rgba(246,173,85,0.1)', border: '1px solid #744210', borderRadius: 8,
@@ -150,14 +187,16 @@ export function AboutPage() {
                 {step.title}
               </h3>
             )}
-            <p style={{ color: t.textSecondary, fontSize: 13.5, lineHeight: 1.7, marginBottom: 14 }}>
+            <p style={{ color: t.textSecondary, fontSize: 13.5, lineHeight: 1.7, marginBottom: step.image ? 14 : 0 }}>
               {step.body}
             </p>
-            <img
-              src={shot(step.image)}
-              alt={step.title || 'Screenshot'}
-              style={{ width: '100%', borderRadius: 8, border: `1px solid ${t.borderOuter}`, display: 'block' }}
-            />
+            {step.image && (
+              <img
+                src={shot(step.image)}
+                alt={step.title || 'Screenshot'}
+                style={{ width: '100%', borderRadius: 8, border: `1px solid ${t.borderOuter}`, display: 'block' }}
+              />
+            )}
           </section>
         ))}
 
