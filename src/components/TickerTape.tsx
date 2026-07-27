@@ -5,7 +5,6 @@ import { estimateDailyChangePct } from '../utils/ohlc'
 import type { Theme } from '../utils/theme'
 
 const BASE_PATH = import.meta.env.BASE_URL
-const MOVE_THRESHOLD = 4
 
 function fmt(n: number, decimals = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -19,20 +18,8 @@ export function TickerTape({ stocks, t }: { stocks: Stock[]; t: Theme }) {
     const today = new Date()
     return stocks
       .map(s => ({ stock: s, change: estimateDailyChangePct(s.ticker, s.price, s.pct1Y, today) }))
-      .filter(m => Math.abs(m.change) >= MOVE_THRESHOLD)
       .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
   }, [stocks])
-
-  if (movers.length === 0) {
-    return (
-      <div style={{
-        background: t.panelBg, borderBottom: `1px solid ${t.borderOuter}`,
-        padding: '8px 16px', textAlign: 'center', fontSize: 11.5, color: t.textMuted,
-      }}>
-        No Nasdaq 100 stocks moving ±{MOVE_THRESHOLD}% today
-      </div>
-    )
-  }
 
   // Duplicated once so the CSS animation can loop seamlessly (scrolls
   // exactly one copy's width, then resets with no visible seam).
