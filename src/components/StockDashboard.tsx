@@ -12,6 +12,7 @@ import { ia12 } from '../data/ia12'
 import { ALL_STOCKS_BY_TICKER, ALL_TICKERS } from '../data/allStocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
+import { TickerTape } from './TickerTape'
 import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 import { parseMarketCap } from '../utils/marketCap'
 import { computeRSI14 } from '../utils/rsi'
@@ -608,6 +609,11 @@ export function StockDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
+      {/* Ticker tape — bleeds to the full page width despite the padding above */}
+      <div style={{ margin: '-24px -16px 20px' }}>
+        <TickerTape stocks={nasdaq100} t={t} />
+      </div>
+
       {/* Header */}
       <div style={{ position: 'relative', textAlign: 'center', marginBottom: 28 }}>
         <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 8 }}>
