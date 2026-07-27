@@ -8,6 +8,7 @@ import { oil } from '../data/oil'
 import { healthcare } from '../data/healthcare'
 import { biotech } from '../data/biotech'
 import { retail } from '../data/retail'
+import { ia12 } from '../data/ia12'
 import { ALL_STOCKS_BY_TICKER, ALL_TICKERS } from '../data/allStocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
@@ -18,8 +19,8 @@ import { parseUrlState, buildUrlPath } from '../utils/urlState'
 import { navigateTo } from '../utils/nav'
 import { THEMES, THEME_KEY, getInitialTheme, darken, type ThemeMode, type Theme } from '../utils/theme'
 
-type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech' | 'retail'
-const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail']
+type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech' | 'retail' | 'ia12'
+const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail', 'ia12']
 function isStockListId(v: string | undefined): v is StockListId {
   return !!v && (STOCK_LIST_IDS as string[]).includes(v)
 }
@@ -34,6 +35,7 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'healthcare':{ stocks: healthcare,   title: 'Healthcare' },
   'biotech':   { stocks: biotech,      title: 'Biotech' },
   'retail':    { stocks: retail,       title: 'Retail' },
+  'ia12':      { stocks: ia12,         title: 'IA12' },
 }
 
 const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
@@ -373,6 +375,8 @@ const SECTOR_PALETTE: Record<string, { bg: string; fg: string }> = {
   'Home Improvement':      { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },
   'Off-Price & Apparel':   { bg: 'rgba(244,114,182,0.15)', fg: '#f472b6' },
   'Specialty Retail':      { bg: 'rgba(129,140,248,0.15)', fg: '#818cf8' },
+  // IA12
+  'Aerospace':             { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
 }
 
 function pctColor(pct: number): string {
@@ -467,7 +471,7 @@ export function StockDashboard() {
     if (!ALL_STOCKS_BY_TICKER[ticker]) {
       // Previously a silent no-op — indistinguishable from the button not
       // working at all. Tell the user why instead.
-      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, or Retail, so it can't be added.`)
+      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, or IA12, so it can't be added.`)
       return
     }
     setCustomLists(prev => prev.map(l =>
@@ -696,6 +700,7 @@ export function StockDashboard() {
             <option value="healthcare">⚕️ Healthcare</option>
             <option value="biotech">🧬 Biotech</option>
             <option value="retail">🛍️ Retail</option>
+            <option value="ia12">🚀 IA12</option>
           </optgroup>
           {customLists.length > 0 && (
             <optgroup label="My Lists">
