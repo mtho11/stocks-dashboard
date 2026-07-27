@@ -338,6 +338,9 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: t.textPrimary }}>${fmt(stock.price)}</div>
+              <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+                P/E {stock.pe !== null ? fmt(stock.pe) : 'n/a'}
+              </div>
             </div>
             <button
               onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
