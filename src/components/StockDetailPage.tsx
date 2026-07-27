@@ -338,14 +338,6 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: t.textPrimary }}>${fmt(stock.price)}</div>
-              <div style={{ display: 'flex', gap: 10, fontSize: 12, marginTop: 2 }}>
-                <span style={{ color: stock.pctYTD >= 0 ? '#38a169' : '#e53e3e', fontWeight: 700 }}>
-                  YTD {fmtPct(stock.pctYTD)}
-                </span>
-                <span style={{ color: stock.pct1Y >= 0 ? '#38a169' : '#e53e3e', fontWeight: 700 }}>
-                  1Y {fmtPct(stock.pct1Y)}
-                </span>
-              </div>
             </div>
             <button
               onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
