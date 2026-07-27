@@ -8,7 +8,7 @@ import {
   type ISeriesApi,
 } from 'lightweight-charts'
 import { ALL_STOCKS_BY_TICKER } from '../data/allStocks'
-import { generateOhlcHistory, generateEarningsDates, estimateNextEarningsDate } from '../utils/ohlc'
+import { generateOhlcHistory, generateEarningsDates, estimateNextEarningsDate, type OhlcBar } from '../utils/ohlc'
 import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
@@ -77,10 +77,31 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     document.title = stock ? `${stock.ticker} — ${stock.company}` : 'Stock not found'
   }, [stock])
 
-  const bars = useMemo(
-    () => stock ? generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date()) : [],
-    [stock]
-  )
+  // Real daily OHLC lives in a ~1MB generated module, so it's loaded on
+  // demand rather than bundled into the initial payload. Tickers without a
+  // real snapshot (the lists still on mock data) fall back to the seeded
+  // synthetic generator.
+  const [barsState, setBarsState] = useState<{ ticker: string; bars: OhlcBar[]; real: boolean } | undefined>()
+
+  useEffect(() => {
+    if (!stock) return
+    let cancelled = false
+    const synthetic = () => generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date())
+    import('../data/ohlcHistory')
+      .then(m => {
+        if (cancelled) return
+        const real = m.getRealBars(stock.ticker)
+        setBarsState({ ticker: stock.ticker, bars: real ?? synthetic(), real: !!real })
+      })
+      .catch(() => {
+        if (!cancelled) setBarsState({ ticker: stock.ticker, bars: synthetic(), real: false })
+      })
+    return () => { cancelled = true }
+  }, [stock])
+
+  const EMPTY_BARS: OhlcBar[] = useMemo(() => [], [])
+  const bars = stock && barsState?.ticker === stock.ticker ? barsState.bars : EMPTY_BARS
+  const isRealData = stock && barsState?.ticker === stock.ticker ? barsState.real : false
   const earningsDates = useMemo(
     () => stock ? generateEarningsDates(stock.ticker, bars) : [],
     [stock, bars]
@@ -411,7 +432,9 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
         </div>
 
         <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
-          Chart data is synthetic — calibrated to this app's mock price and 1Y return, not real market history.
+          {isRealData
+            ? 'Real daily market data — a snapshot, not a live feed, so it does not update on its own.'
+            : "Chart data is synthetic — calibrated to this app's mock price and 1Y return, not real market history."}
         </p>
       </div>
     </div>

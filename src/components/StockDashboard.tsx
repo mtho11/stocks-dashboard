@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { stocks as aiCakeStocks } from '../data/stocks'
+import { stocks as aiCakeStocks, SNAPSHOT_DATE } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
 import { sp500 } from '../data/sp500'
 import { dji } from '../data/dji'
@@ -13,7 +13,6 @@ import { ALL_STOCKS_BY_TICKER, ALL_TICKERS } from '../data/allStocks'
 import type { Stock } from '../types/stock'
 import { Sparkline } from './Sparkline'
 import { TickerTape } from './TickerTape'
-import { getHistoricalStocks, REFERENCE_DATE } from '../utils/historical'
 import { parseMarketCap } from '../utils/marketCap'
 import { computeRSI14 } from '../utils/rsi'
 import { parseUrlState, buildUrlPath } from '../utils/urlState'
@@ -39,12 +38,6 @@ const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'ia12':      { stocks: ia12,         title: 'IA12' },
 }
 
-const REF_STR = REFERENCE_DATE.toISOString().slice(0, 10) // "2026-06-02"
-const MIN_DATE = '2024-01-01'
-const TODAY_STR = new Date().toISOString().slice(0, 10)
-// The date input's ceiling: real "today" once it passes the mock timeline's
-// reference date (the normal case), otherwise the reference date itself.
-const MAX_DATE = TODAY_STR > REF_STR ? TODAY_STR : REF_STR
 const FAVORITES_KEY = 'stocks-dashboard-favorites'
 const CUSTOM_LISTS_KEY = 'stocks-dashboard-custom-lists'
 const BASE_PATH = import.meta.env.BASE_URL
@@ -103,15 +96,11 @@ function resolveActiveList(id: string, customLists: CustomList[]): { stocks: Sto
   return { stocks: ranked, title: cl.name || 'Custom List' }
 }
 
-function readUrlState(): { listId: string; date: string } {
-  if (typeof window === 'undefined') return { listId: 'ai-cake', date: TODAY_STR }
-  const { listId, date } = parseUrlState(window.location.pathname, BASE_PATH)
+function readUrlListId(): string {
+  if (typeof window === 'undefined') return 'ai-cake'
+  const { listId } = parseUrlState(window.location.pathname, BASE_PATH)
   const customLists = loadCustomLists()
-  const validListId = listId && (isStockListId(listId) || customLists.some(l => l.id === listId)) ? listId : 'ai-cake'
-  return {
-    listId: validListId,
-    date: date && date >= MIN_DATE && date <= MAX_DATE ? date : TODAY_STR,
-  }
+  return listId && (isStockListId(listId) || customLists.some(l => l.id === listId)) ? listId : 'ai-cake'
 }
 
 function formatDisplayDate(iso: string) {
@@ -423,13 +412,11 @@ function fmtPct(n: number): string {
 
 export function StockDashboard() {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
-  const [initialUrlState] = useState(readUrlState)
-  const [stockListId, setStockListId] = useState<string>(initialUrlState.listId)
+  const [stockListId, setStockListId] = useState<string>(readUrlListId)
   const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
-  const [selectedDate, setSelectedDate] = useState(initialUrlState.date)
   const [favoritesByList, setFavoritesByList] = useState<Record<string, string[]>>(loadFavorites)
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(createEmptyFilters)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
@@ -488,17 +475,17 @@ export function StockDashboard() {
     ))
   }
 
-  // Keep the URL in sync with list + date so the app state is bookmarkable
-  // and shareable, e.g. /stocks-dashboard/nasdaq100/2026-07-13. Uses
-  // replaceState (not pushState) so picking dates/lists doesn't spam
-  // browser history — editing the URL bar directly still works since that's
-  // a real navigation, which re-reads it via readUrlState() on load.
+  // Keep the URL in sync with the active list so the view is bookmarkable
+  // and shareable, e.g. /stocks-dashboard/nasdaq100. Uses replaceState (not
+  // pushState) so switching lists doesn't spam browser history — editing the
+  // URL bar directly still works since that's a real navigation, which
+  // re-reads it via readUrlListId() on load.
   useEffect(() => {
-    const path = buildUrlPath(BASE_PATH, stockListId, selectedDate)
+    const path = buildUrlPath(BASE_PATH, stockListId)
     if (window.location.pathname !== path) {
       window.history.replaceState(null, '', path + window.location.search)
     }
-  }, [stockListId, selectedDate])
+  }, [stockListId])
 
   // Switches the active list and clears any stale ticker-add state from
   // whichever custom list's editor was previously open.
@@ -544,13 +531,7 @@ export function StockDashboard() {
     })
   }
 
-  const isHistorical = selectedDate < REF_STR
-  const isToday = selectedDate === TODAY_STR
-
-  const baseStocks = useMemo(() => {
-    if (!isHistorical) return sourceStocks
-    return getHistoricalStocks(sourceStocks, new Date(selectedDate + 'T12:00:00Z'))
-  }, [selectedDate, isHistorical, sourceStocks])
+  const baseStocks = sourceStocks
 
   const availableSectors = useMemo(
     () => [...new Set(sourceStocks.map(s => s.sector))].sort(),
@@ -660,8 +641,7 @@ export function StockDashboard() {
           {activeList.title}
         </h1>
         <p style={{ color: t.textMuted, fontSize: 13 }}>
-          by @mtho11 · {formatDisplayDate(selectedDate)}
-          {isHistorical && <span style={{ marginLeft: 8, color: '#f6ad55', fontWeight: 600 }}>· historical</span>}
+          by @mtho11 · {formatDisplayDate(SNAPSHOT_DATE)}
         </p>
       </div>
 
@@ -1041,37 +1021,6 @@ export function StockDashboard() {
           {sorted.length} stocks
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-          <label style={{ color: t.textSecondary, fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
-            Date
-          </label>
-          <input
-            type="date"
-            min={MIN_DATE}
-            max={MAX_DATE}
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            style={{
-              background: isHistorical ? 'rgba(246,173,85,0.1)' : t.inputBg,
-              border: `1px solid ${isHistorical ? '#744210' : t.borderControl}`,
-              borderRadius: 8, color: isHistorical ? '#dd6b20' : t.textPrimary,
-              padding: '7px 10px', fontSize: 12, outline: 'none', cursor: 'pointer',
-            }}
-          />
-          {!isToday && (
-            <button
-              onClick={() => setSelectedDate(TODAY_STR)}
-              style={{
-                padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', border: '1px solid #744210',
-                background: 'rgba(246,173,85,0.15)', color: '#dd6b20',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </div>
       </div>
 
       {activeCustomList && activeCustomList.tickers.length === 0 && (

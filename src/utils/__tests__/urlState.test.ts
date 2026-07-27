@@ -35,12 +35,12 @@ describe('parseUrlState', () => {
 })
 
 describe('buildUrlPath', () => {
-  it('joins base, list, and date with no double slashes', () => {
-    expect(buildUrlPath(BASE, 'nasdaq100', '2026-07-13')).toBe('/stocks-dashboard/nasdaq100/2026-07-13')
+  it('joins base and list with no double slashes', () => {
+    expect(buildUrlPath(BASE, 'nasdaq100')).toBe('/stocks-dashboard/nasdaq100')
   })
 
   it('round-trips through parseUrlState', () => {
-    const path = buildUrlPath(BASE, 'sp500', '2025-01-01')
-    expect(parseUrlState(path, BASE)).toEqual({ listId: 'sp500', date: '2025-01-01' })
+    const path = buildUrlPath(BASE, 'sp500')
+    expect(parseUrlState(path, BASE)).toEqual({ listId: 'sp500', date: undefined })
   })
 })

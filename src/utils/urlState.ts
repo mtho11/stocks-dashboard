@@ -19,6 +19,6 @@ export function parseUrlState(pathname: string, base: string): { listId?: string
   }
 }
 
-export function buildUrlPath(base: string, listId: string, date: string): string {
-  return `${base}${listId}/${date}`
+export function buildUrlPath(base: string, listId: string): string {
+  return `${base}${listId}`
 }
