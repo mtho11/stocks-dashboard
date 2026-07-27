@@ -1048,7 +1048,6 @@ export function StockDashboard() {
               <Th label="Sector" sk="sector" tip="Industry sector classification." {...thProps} />
               <Th label="Price" sk="price" right tip="Latest share price." {...thProps} />
               <Th label="Mkt Cap" sk="marketCap" right tip="Total market capitalization — share price × shares outstanding." {...thProps} />
-              <Th label="P/S" right tip="Price-to-sales ratio — share price divided by revenue per share." {...thProps} />
               <Th label="P/E" right tip="Price-to-earnings ratio — share price divided by earnings per share." {...thProps} />
               <Th label="% YTD" sk="pctYTD" tip="Percent price change since the start of the calendar year." {...thProps} />
               <Th label="% 1Y" sk="pct1Y" tip="Percent price change over the trailing 12 months." {...thProps} />
@@ -1164,16 +1163,6 @@ export function StockDashboard() {
                   {/* Market Cap */}
                   <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{ color: t.textSecondary }}>{s.marketCap}</span>
-                  </td>
-
-                  {/* P/S */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
-                    <span style={{
-                      color: s.ps !== null && s.ps > 100 ? '#dd6b20' : t.textSecondary,
-                      fontWeight: s.ps !== null && s.ps > 100 ? 700 : 400,
-                    }}>
-                      {s.ps !== null ? fmt(s.ps) : <span style={{ color: t.textMuted }}>n/a</span>}
-                    </span>
                   </td>
 
                   {/* P/E */}
@@ -1296,7 +1285,7 @@ export function StockDashboard() {
               <td style={{ padding: '10px 8px', textAlign: 'right', color: t.textSecondary, fontWeight: 700, fontSize: 12 }}>
                 {totalMktCap}
               </td>
-              <td colSpan={2} />
+              <td colSpan={1} />
               <td colSpan={15} />
             </tr>
           </tfoot>
