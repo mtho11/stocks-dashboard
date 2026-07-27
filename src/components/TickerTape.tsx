@@ -1,30 +1,27 @@
+import { useMemo } from 'react'
 import type { Stock } from '../types/stock'
 import { navigateTo } from '../utils/nav'
+import { estimateDailyChangePct } from '../utils/ohlc'
 import type { Theme } from '../utils/theme'
 
 const BASE_PATH = import.meta.env.BASE_URL
 const MOVE_THRESHOLD = 4
-
-// Sparkline data is the closest thing each Stock carries to a real daily
-// series, so day-over-day change of its last two points stands in for
-// "today's move" — there's no dedicated daily-change field in the model.
-function dailyChangePct(s: Stock): number {
-  const n = s.sparklineData.length
-  if (n < 2) return 0
-  const prev = s.sparklineData[n - 2]
-  const last = s.sparklineData[n - 1]
-  return prev > 0 ? ((last - prev) / prev) * 100 : 0
-}
 
 function fmt(n: number, decimals = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
 export function TickerTape({ stocks, t }: { stocks: Stock[]; t: Theme }) {
-  const movers = stocks
-    .map(s => ({ stock: s, change: dailyChangePct(s) }))
-    .filter(m => Math.abs(m.change) >= MOVE_THRESHOLD)
-    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+  // Same 1D calibration the detail page's chart uses (seeded by ticker +
+  // today's date, ending exactly at the stock's real price), so a ticker
+  // shown here moving e.g. +6% matches what its own detail page reports.
+  const movers = useMemo(() => {
+    const today = new Date()
+    return stocks
+      .map(s => ({ stock: s, change: estimateDailyChangePct(s.ticker, s.price, s.pct1Y, today) }))
+      .filter(m => Math.abs(m.change) >= MOVE_THRESHOLD)
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+  }, [stocks])
 
   if (movers.length === 0) {
     return (

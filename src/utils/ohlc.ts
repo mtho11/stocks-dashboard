@@ -99,6 +99,25 @@ export function generateOhlcHistory(ticker: string, endPrice: number, pct1Y: num
   return bars
 }
 
+// Same seed and math as generateOhlcHistory's most recent day, without
+// building the full 5-year series — useful for callers (like the ticker
+// tape) that only need today's move for many stocks at once. Reproducing
+// the same rng draws in the same order keeps this consistent with the
+// 1D figure the detail page shows for the same ticker/date.
+export function estimateDailyChangePct(ticker: string, price: number, pct1Y: number, endDate: Date): number {
+  const end = new Date(endDate)
+  while (isWeekend(end)) end.setUTCDate(end.getUTCDate() - 1)
+
+  const rng = mulberry32(tickerSeed(ticker) ^ dateSeed(end))
+  const annualRate = pct1Y / 100
+  const dailyDrift = Math.pow(1 + annualRate, 1 / TRADING_DAYS_PER_YEAR) - 1
+  const dailyVol = 0.014 + rng() * 0.012
+  const shock = (rng() - 0.5) * 2 * dailyVol
+
+  const prevClose = price / (1 + dailyDrift + shock)
+  return prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0
+}
+
 const EARNINGS_INTERVAL = 63 // ~1 trading quarter
 const EARNINGS_JITTER = 4 // days either side, so releases don't fall on the same weekday every quarter
 
