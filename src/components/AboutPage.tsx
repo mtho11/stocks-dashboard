@@ -14,7 +14,7 @@ const STEPS: Step[] = [
   {
     title: '1. Pick a stock group',
     image: '01-overview.png',
-    body: "The dropdown in the top-left switches between ten built-in groups — Jensen's AI Cake (a hand-picked AI/deep-tech watchlist, and the one group carrying real market data), Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, and IA12 — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
+    body: "The dropdown in the top-left switches between nine built-in groups — Jensen's AI Cake (a hand-picked AI/deep-tech watchlist, and the one group carrying real market data), Nasdaq 100, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, and IA12 — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
   },
   {
     title: '2. Sort any column',
@@ -44,7 +44,7 @@ const STEPS: Step[] = [
   {
     title: '6. Star your favorites',
     image: '07-favorites.png',
-    body: 'Click the star on any row to favorite it, then click the ★ column header to pin favorites to the top. Favorites are remembered separately for each stock group, so starring AAPL in the S&P 500 view won’t affect the Nasdaq 100 view.',
+    body: 'Click the star on any row to favorite it, then click the ★ column header to pin favorites to the top. Favorites are remembered separately for each stock group, so starring a ticker in one view won’t affect another.',
   },
   {
     title: '7. Build your own list',
@@ -138,8 +138,8 @@ export function AboutPage() {
         }}>
           <h2 style={{ color: t.textPrimary, fontSize: 18, fontWeight: 700, marginBottom: 10 }}>What this is</h2>
           <p style={{ color: t.textSecondary, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
-            Mike's Market Monitor is a stock-screening dashboard for exploring ten groups of
-            stocks — an AI/deep-tech watchlist, the Nasdaq 100, the S&amp;P 500, the Dow 30, Finance,
+            Mike's Market Monitor is a stock-screening dashboard for exploring nine groups of
+            stocks — an AI/deep-tech watchlist, the Nasdaq 100, the Dow 30, Finance,
             Oil &amp; Energy, Healthcare, Biotech, Retail, and IA12 — plus any custom lists you build
             yourself. Every row carries price, market cap, valuation ratios, three return windows
             of sparkline charts, momentum indicators (RSI, RS Rank), moving-average direction, and

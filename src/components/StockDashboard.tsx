@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { stocks as aiCakeStocks, SNAPSHOT_DATE } from '../data/stocks'
 import { nasdaq100 } from '../data/nasdaq100'
-import { sp500 } from '../data/sp500'
 import { dji } from '../data/dji'
 import { finance } from '../data/finance'
 import { oil } from '../data/oil'
@@ -19,8 +18,8 @@ import { parseUrlState, buildUrlPath } from '../utils/urlState'
 import { navigateTo } from '../utils/nav'
 import { THEMES, THEME_KEY, getInitialTheme, darken, type ThemeMode, type Theme } from '../utils/theme'
 
-type StockListId = 'ai-cake' | 'nasdaq100' | 'sp500' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech' | 'retail' | 'ia12'
-const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'sp500', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail', 'ia12']
+type StockListId = 'ai-cake' | 'nasdaq100' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech' | 'retail' | 'ia12'
+const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail', 'ia12']
 function isStockListId(v: string | undefined): v is StockListId {
   return !!v && (STOCK_LIST_IDS as string[]).includes(v)
 }
@@ -28,7 +27,6 @@ function isStockListId(v: string | undefined): v is StockListId {
 const STOCK_LISTS: Record<StockListId, { stocks: Stock[]; title: string }> = {
   'ai-cake':   { stocks: aiCakeStocks, title: "Mike's Market Monitor" },
   'nasdaq100': { stocks: nasdaq100,    title: 'Nasdaq 100' },
-  'sp500':     { stocks: sp500,        title: 'S&P 500' },
   'dji':       { stocks: dji,          title: 'Dow Jones Industrial Average' },
   'finance':   { stocks: finance,      title: 'Finance' },
   'oil':       { stocks: oil,          title: 'Oil & Energy' },
@@ -43,7 +41,7 @@ const CUSTOM_LISTS_KEY = 'stocks-dashboard-custom-lists'
 const BASE_PATH = import.meta.env.BASE_URL
 
 // Favorites are stored per stock list ({ [listId]: ticker[] }) so marking
-// AAPL a favorite in Nasdaq 100 doesn't bleed into the S&P 500 view.
+// AAPL a favorite in Nasdaq 100 doesn't bleed into another list's view.
 function loadFavorites(): Record<string, string[]> {
   if (typeof window === 'undefined') return {}
   try {
@@ -459,7 +457,7 @@ export function StockDashboard() {
     if (!ALL_STOCKS_BY_TICKER[ticker]) {
       // Previously a silent no-op — indistinguishable from the button not
       // working at all. Tell the user why instead.
-      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, S&P 500, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, or IA12, so it can't be added.`)
+      setTickerError(`"${ticker}" isn't in AI Cake, Nasdaq 100, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, or IA12, so it can't be added.`)
       return
     }
     setCustomLists(prev => prev.map(l =>
@@ -679,7 +677,6 @@ export function StockDashboard() {
           <optgroup label="Indices">
             <option value="ai-cake">🎂 AI Cake</option>
             <option value="nasdaq100">📊 Nasdaq 100</option>
-            <option value="sp500">📈 S&amp;P 500</option>
             <option value="dji">🏛 Dow 30</option>
             <option value="finance">🏦 Finance</option>
             <option value="oil">🛢️ Oil &amp; Energy</option>

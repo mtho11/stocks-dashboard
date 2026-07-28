@@ -1,6 +1,5 @@
 import { stocks as aiCakeStocks } from './stocks'
 import { nasdaq100 } from './nasdaq100'
-import { sp500 } from './sp500'
 import { dji } from './dji'
 import { finance } from './finance'
 import { oil } from './oil'
@@ -15,7 +14,7 @@ import type { Stock } from '../types/stock'
 // built-in list it "lives" in. First list wins on overlap; the shared
 // tickers were kept numerically consistent across files anyway.
 export const ALL_STOCKS_BY_TICKER: Record<string, Stock> = {}
-for (const list of [aiCakeStocks, nasdaq100, sp500, dji, finance, oil, healthcare, biotech, retail, ia12]) {
+for (const list of [aiCakeStocks, nasdaq100, dji, finance, oil, healthcare, biotech, retail, ia12]) {
   for (const s of list) {
     if (!(s.ticker in ALL_STOCKS_BY_TICKER)) ALL_STOCKS_BY_TICKER[s.ticker] = s
   }
