@@ -14,7 +14,7 @@ const STEPS: Step[] = [
   {
     title: '1. Pick a stock group',
     image: '01-overview.png',
-    body: "The dropdown in the top-left switches between nine built-in groups — Jensen's AI Cake (a hand-picked AI/deep-tech watchlist, and the one group carrying real market data), Nasdaq 100, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, and IA12 — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
+    body: "The dropdown in the top-left switches between nine built-in groups — Jensen's AI Cake (a hand-picked AI/deep-tech watchlist), Nasdaq 100, Dow 30, Finance, Oil & Energy, Healthcare, Biotech, Retail, and IA12 — plus any custom lists you've created. Every column, chart, and stat updates instantly for whichever group is active.",
   },
   {
     title: '2. Sort any column',
@@ -163,10 +163,10 @@ export function AboutPage() {
             background: 'rgba(246,173,85,0.1)', border: '1px solid #744210', borderRadius: 8,
             padding: '10px 14px', color: '#dd6b20', fontSize: 13, lineHeight: 1.6,
           }}>
-            ⚠️ <strong>Mixed data sources.</strong> The AI Cake list uses <strong>real market data</strong>,
-            captured as a one-time snapshot — it is not a live feed and does not update on its own.
-            The other groups are still mock data from seeded pseudo-random generators. Nothing here
-            is investment advice.
+            ⚠️ <strong>Real market data</strong>, captured as a one-time snapshot — it is not a live
+            feed and does not update on its own. A handful of tickers without a usable real quote
+            (e.g. SPCX, which isn't publicly traded) fall back to a hand-authored mock estimate.
+            Nothing here is investment advice.
           </div>
         </section>
 

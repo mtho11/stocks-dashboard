@@ -1,21 +1,44 @@
-// Fetches real market data (Yahoo Finance chart API) for the AI Cake list
-// and regenerates src/data/stocks.ts + src/data/ohlcHistory.ts.
+// Fetches real market data (Yahoo Finance chart API) for every built-in
+// stock list and regenerates src/data/*.ts + src/data/ohlcHistory.ts.
 //
 // Run with: node scripts/fetch-real-data.mjs
 //
 // This is a build-time snapshot tool, not something the deployed app calls —
 // the site is static (GitHub Pages, no backend), so real data has to be
 // baked in. Re-run this to refresh the snapshot.
+//
+// Tickers that fail to fetch (e.g. SPCX/SpaceX, which isn't publicly
+// traded) fall back to their previous hand-authored mock row rather than
+// being dropped, except in stocks.ts/AI Cake where there's no mock row to
+// fall back to (those simply keep whatever they already had).
 
-import { writeFileSync, readFileSync } from 'node:fs'
+import { writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import * as esbuild from 'esbuild'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const UA = 'Mozilla/5.0'
 
-// Sector labels aren't available from the price API, so they live in their
-// own file (aiCakeSectors.ts) rather than in stocks.ts — this script
-// overwrites stocks.ts, so reading sectors from there would destroy them.
+// ── Load the current (mock or previously-real) content of every list ──────
+// so we have tickers to fetch and a fallback row per ticker if a fetch fails.
+const LIST_FILES = ['nasdaq100', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail', 'ia12']
+
+async function loadOriginalRows(name) {
+  const entry = join(ROOT, `src/data/${name}.ts`)
+  const result = await esbuild.build({
+    entryPoints: [entry], bundle: true, write: false, format: 'esm', platform: 'node',
+  })
+  const tmp = join(ROOT, `scripts/.tmp-${name}.mjs`)
+  writeFileSync(tmp, result.outputFiles[0].text)
+  try {
+    const mod = await import(`${tmp}?t=${Date.now()}`)
+    return mod[name]
+  } finally {
+    rmSync(tmp)
+  }
+}
+
 function existingSectors() {
   const src = readFileSync(join(ROOT, 'src/data/aiCakeSectors.ts'), 'utf8')
   const map = {}
@@ -23,11 +46,23 @@ function existingSectors() {
   return map
 }
 
-const SECTORS = existingSectors()
-const TICKERS = Object.keys(SECTORS)
+const AI_CAKE_SECTORS = existingSectors()
+const AI_CAKE_TICKERS = Object.keys(AI_CAKE_SECTORS)
 
-// The v7 batch-quote endpoint (the only one carrying market cap and P/E)
-// requires Yahoo's cookie + crumb handshake; the chart endpoint doesn't.
+const originalRowsByList = {}
+for (const name of LIST_FILES) {
+  originalRowsByList[name] = await loadOriginalRows(name)
+}
+
+// ── Union of every ticker we need real data for ───────────────────────────
+const ALL_TICKERS = [...new Set([
+  ...AI_CAKE_TICKERS,
+  ...LIST_FILES.flatMap(name => originalRowsByList[name].map(r => r.ticker)),
+])].sort()
+
+process.stderr.write(`Fetching ${ALL_TICKERS.length} unique tickers...\n`)
+
+// ── Yahoo Finance fetch helpers ────────────────────────────────────────────
 async function getCrumb() {
   const res = await fetch('https://fc.yahoo.com', { headers: { 'User-Agent': UA } })
   const cookie = (res.headers.getSetCookie?.() ?? []).map(c => c.split(';')[0]).join('; ')
@@ -36,8 +71,6 @@ async function getCrumb() {
   })
   return { crumb: (await crumbRes.text()).trim(), cookie }
 }
-
-const UA = 'Mozilla/5.0'
 
 async function fetchQuotes(tickers, { crumb, cookie }) {
   const out = {}
@@ -54,7 +87,7 @@ async function fetchQuotes(tickers, { crumb, cookie }) {
 
 async function fetchTicker(ticker) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=5y&interval=1d`
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+  const res = await fetch(url, { headers: { 'User-Agent': UA } })
   if (!res.ok) throw new Error(`${ticker}: HTTP ${res.status}`)
   const json = await res.json()
   const r = json.chart?.result?.[0]
@@ -66,10 +99,7 @@ async function fetchTicker(ticker) {
     if (q.close[i] == null || q.open[i] == null) continue
     bars.push({
       time: new Date(r.timestamp[i] * 1000).toISOString().slice(0, 10),
-      open: round2(q.open[i]),
-      high: round2(q.high[i]),
-      low: round2(q.low[i]),
-      close: round2(q.close[i]),
+      open: round2(q.open[i]), high: round2(q.high[i]), low: round2(q.low[i]), close: round2(q.close[i]),
     })
   }
   return { meta: r.meta, bars }
@@ -78,7 +108,6 @@ async function fetchTicker(ticker) {
 const round2 = n => Math.round(n * 100) / 100
 const round1 = n => Math.round(n * 10) / 10
 
-// Percent change over the last `n` trading days of the close series.
 function pctOver(closes, n) {
   const i = closes.length - 1 - n
   if (i < 0 || !closes[i]) return null
@@ -106,35 +135,39 @@ function fmtMarketCap(n) {
   return `$${(n / 1e6).toFixed(0)}M`
 }
 
-const results = []
-const failed = []
-
-for (const ticker of TICKERS) {
-  try {
-    const { meta, bars } = await fetchTicker(ticker)
-    if (bars.length < 60) throw new Error(`only ${bars.length} bars`)
-    results.push({ ticker, meta, bars })
-    process.stderr.write(`. ${ticker}\n`)
-  } catch (err) {
-    failed.push(`${ticker}: ${err.message}`)
-    process.stderr.write(`X ${ticker} — ${err.message}\n`)
+// ── Fetch everything, with modest concurrency ──────────────────────────────
+const chartResults = new Map()
+const CONCURRENCY = 10
+let cursor = 0
+async function worker() {
+  while (cursor < ALL_TICKERS.length) {
+    const ticker = ALL_TICKERS[cursor++]
+    try {
+      const { meta, bars } = await fetchTicker(ticker)
+      if (bars.length < 60) throw new Error(`only ${bars.length} bars`)
+      chartResults.set(ticker, { meta, bars })
+      process.stderr.write(`. ${ticker}\n`)
+    } catch (err) {
+      process.stderr.write(`X ${ticker} — ${err.message}\n`)
+    }
   }
 }
+await Promise.all(Array.from({ length: CONCURRENCY }, worker))
 
-if (failed.length) {
-  console.error(`\n${failed.length} ticker(s) failed:\n  ${failed.join('\n  ')}`)
-}
+const quotes = await fetchQuotes([...chartResults.keys()], await getCrumb())
+process.stderr.write(`\nfetched ${chartResults.size}/${ALL_TICKERS.length} charts, ${Object.keys(quotes).length} quotes\n`)
 
-const quotes = await fetchQuotes(results.map(r => r.ticker), await getCrumb())
-process.stderr.write(`\nfetched ${Object.keys(quotes).length} quotes (market cap / P/E)\n`)
+const snapshotDate = [...chartResults.values()][0]?.bars.at(-1).time ?? new Date().toISOString().slice(0, 10)
 
-// ── Build stocks.ts ────────────────────────────────────────────────────
-const rows = results.map(({ ticker, meta, bars }) => {
+// ── Build a real Stock row from fetched data ───────────────────────────────
+function buildRealRow(ticker, sector) {
+  const chart = chartResults.get(ticker)
+  if (!chart) return null
+  const { meta, bars } = chart
   const closes = bars.map(b => b.close)
   const quote = quotes[ticker] ?? {}
   const price = quote.regularMarketPrice ?? meta.regularMarketPrice ?? closes.at(-1)
   const high52 = meta.fiftyTwoWeekHigh ?? Math.max(...closes.slice(-252))
-
   const ma20 = sma(closes, 20)
   const ma50 = sma(closes, 50)
   const ma200 = sma(closes, 200)
@@ -142,9 +175,10 @@ const rows = results.map(({ ticker, meta, bars }) => {
   return {
     ticker,
     company: (meta.longName ?? meta.shortName ?? ticker).replace(/[,.]?\s+(Inc|Corp|Corporation|Company|Ltd|plc|N\.V|S\.A)\.?$/i, ''),
-    sector: SECTORS[ticker] ?? 'Other',
+    sector,
     price: round2(price),
     marketCap: fmtMarketCap(quote.marketCap),
+    ps: null,
     pe: quote.trailingPE != null ? round2(quote.trailingPE) : null,
     pctYTD: round2(pctYTD(bars) ?? 0),
     pct1Y: round2(pctOver(closes, 252) ?? 0),
@@ -156,20 +190,31 @@ const rows = results.map(({ ticker, meta, bars }) => {
     sma20: ma20 && price > ma20 ? 'up' : 'down',
     sma50: ma50 && price > ma50 ? 'up' : 'down',
     sma200: ma200 && price > ma200 ? 'up' : 'down',
-    spark: closes.slice(-30).map(round2),
+    sparklineData: closes.slice(-30).map(round2),
   }
-})
-
-// RS Rank: percentile by 1Y performance within this cohort.
-const byPerf = [...rows].sort((a, b) => b.pct1Y - a.pct1Y)
-const n = byPerf.length - 1
-for (const row of rows) {
-  row.rsRank = Math.round(99 - (byPerf.findIndex(x => x.ticker === row.ticker) / n) * 65)
 }
 
-const snapshotDate = results[0]?.bars.at(-1).time ?? new Date().toISOString().slice(0, 10)
+function withRsRank(rows) {
+  const byPerf = [...rows].sort((a, b) => b.pct1Y - a.pct1Y)
+  const n = byPerf.length - 1
+  return rows.map(row => ({
+    ...row,
+    rsRank: n <= 0 ? 99 : Math.round(99 - (byPerf.findIndex(x => x.ticker === row.ticker) / n) * 65),
+  }))
+}
 
-const stocksTs = `import type { Stock } from '../types/stock'
+function stockRowLiteral(r) {
+  return `  { ticker: ${JSON.stringify(r.ticker)}, company: ${JSON.stringify(r.company)}, sector: ${JSON.stringify(r.sector)}, price: ${r.price}, marketCap: ${JSON.stringify(r.marketCap)}, ps: ${r.ps === null ? 'null' : r.ps}, pe: ${r.pe === null ? 'null' : r.pe}, pctYTD: ${r.pctYTD}, pct1Y: ${r.pct1Y}, deltaHighs: ${r.deltaHighs}, rsRank: ${r.rsRank}, ret1W: ${r.ret1W}, ret1M: ${r.ret1M}, ret3M: ${r.ret3M}, ret6M: ${r.ret6M}, sma20: '${r.sma20}', sma50: '${r.sma50}', sma200: '${r.sma200}', sparklineData: [${r.sparklineData.join(',')}] },`
+}
+
+// ── stocks.ts (AI Cake) ─────────────────────────────────────────────────
+const aiCakeRows = withRsRank(
+  AI_CAKE_TICKERS.map(t => buildRealRow(t, AI_CAKE_SECTORS[t] ?? 'Other')).filter(Boolean)
+)
+const failedAiCake = AI_CAKE_TICKERS.filter(t => !chartResults.has(t))
+if (failedAiCake.length) console.error(`AI Cake: dropped (no real data): ${failedAiCake.join(', ')}`)
+
+writeFileSync(join(ROOT, 'src/data/stocks.ts'), `import type { Stock } from '../types/stock'
 
 // REAL MARKET DATA — snapshot fetched ${snapshotDate} from Yahoo Finance.
 // Generated by scripts/fetch-real-data.mjs; re-run that to refresh.
@@ -178,53 +223,110 @@ const stocksTs = `import type { Stock } from '../types/stock'
 export const SNAPSHOT_DATE = '${snapshotDate}'
 
 export const stocks: Stock[] = [
-${rows.map(r => `  { ticker: ${JSON.stringify(r.ticker)}, company: ${JSON.stringify(r.company)}, sector: ${JSON.stringify(r.sector)}, price: ${r.price}, marketCap: ${JSON.stringify(r.marketCap)}, ps: null, pe: ${r.pe}, pctYTD: ${r.pctYTD}, pct1Y: ${r.pct1Y}, deltaHighs: ${r.deltaHighs}, rsRank: ${r.rsRank}, ret1W: ${r.ret1W}, ret1M: ${r.ret1M}, ret3M: ${r.ret3M}, ret6M: ${r.ret6M}, sma20: '${r.sma20}', sma50: '${r.sma50}', sma200: '${r.sma200}', sparklineData: [${r.spark.join(',')}] },`).join('\n')}
+${aiCakeRows.map(stockRowLiteral).join('\n')}
 ]
-`
-writeFileSync(join(ROOT, 'src/data/stocks.ts'), stocksTs)
+`)
 
-// ── Build ohlcHistory.ts (real candles for the detail page) ────────────
-// One shared date axis (the union of every ticker's trading days) so date
-// strings aren't duplicated 50x — each ticker just records the index it
-// starts at, since newer listings simply begin later on the same axis.
-const allDates = [...new Set(results.flatMap(r => r.bars.map(b => b.time)))].sort()
+// ── The 8 remaining lists ───────────────────────────────────────────────
+const LIST_META = {
+  nasdaq100: { export: 'nasdaq100', label: 'Nasdaq 100' },
+  dji: { export: 'dji', label: 'Dow 30' },
+  finance: { export: 'finance', label: 'Finance' },
+  oil: { export: 'oil', label: 'Oil & Energy' },
+  healthcare: { export: 'healthcare', label: 'Healthcare' },
+  biotech: { export: 'biotech', label: 'Biotech' },
+  retail: { export: 'retail', label: 'Retail' },
+  ia12: { export: 'ia12', label: 'IA12' },
+}
+
+for (const name of LIST_FILES) {
+  const original = originalRowsByList[name]
+  const fallbackTickers = []
+  const rows = withRsRank(original.map(orig => {
+    const real = buildRealRow(orig.ticker, orig.sector)
+    if (real) return real
+    fallbackTickers.push(orig.ticker)
+    return orig
+  }))
+
+  const fallbackNote = fallbackTickers.length
+    ? `\n// Fell back to a mock estimate for: ${fallbackTickers.join(', ')} (real data unavailable — e.g. not publicly traded).`
+    : ''
+
+  writeFileSync(join(ROOT, `src/data/${name}.ts`), `import type { Stock } from '../types/stock'
+
+// REAL MARKET DATA — snapshot fetched ${snapshotDate} from Yahoo Finance.
+// Generated by scripts/fetch-real-data.mjs; re-run that to refresh.${fallbackNote}
+export const ${LIST_META[name].export}: Stock[] = [
+${rows.map(stockRowLiteral).join('\n')}
+]
+`)
+  if (fallbackTickers.length) process.stderr.write(`${name}: fell back for ${fallbackTickers.join(', ')}\n`)
+}
+
+// ── ohlcHistory/ (real candles, sharded so a detail page only loads the ────
+// chunk its own ticker lives in, not all ~250 tickers' history at once)
+const allDates = [...new Set([...chartResults.values()].flatMap(({ bars }) => bars.map(b => b.time)))].sort()
 const dateIndex = new Map(allDates.map((d, i) => [d, i]))
 
-const packed = results.map(({ ticker, bars }) => {
+const packed = [...chartResults.entries()].map(([ticker, { bars }]) => {
   const start = dateIndex.get(bars[0].time)
-  // Only emit tickers whose bars sit contiguously on the shared axis;
-  // otherwise fall back to storing this ticker's own dates.
   const contiguous = bars.every((b, i) => dateIndex.get(b.time) === start + i)
   return { ticker, bars, start, contiguous }
 })
 
-const ohlcTs = `import type { OhlcBar } from '../utils/ohlc'
+const CHUNK_COUNT = 10
+const tickers = packed.map(p => p.ticker).sort()
+const chunkOf = Object.fromEntries(tickers.map((t, i) => [t, i % CHUNK_COUNT]))
 
-// REAL daily OHLC — snapshot fetched ${snapshotDate} from Yahoo Finance.
+const ohlcDir = join(ROOT, 'src/data/ohlcHistory')
+rmSync(ohlcDir, { recursive: true, force: true })
+mkdirSync(ohlcDir)
+
+writeFileSync(join(ohlcDir, 'manifest.ts'), `// REAL daily OHLC — snapshot fetched ${snapshotDate} from Yahoo Finance.
 // Generated by scripts/fetch-real-data.mjs.
-//
-// Bars are [open, high, low, close] packed positionally, and all tickers
-// share one DATES axis (each records the index it starts at) — storing a
-// date string per bar per ticker roughly doubled this file.
-export type PackedBar = [number, number, number, number]
+export const DATES: string[] = [${allDates.map(d => JSON.stringify(d)).join(',')}]
+export const CHUNK_OF: Record<string, number> = ${JSON.stringify(chunkOf)}
+`)
 
-const DATES: string[] = [${allDates.map(d => JSON.stringify(d)).join(',')}]
+for (let c = 0; c < CHUNK_COUNT; c++) {
+  const entries = packed.filter(p => chunkOf[p.ticker] === c)
+  writeFileSync(join(ohlcDir, `chunk${c}.ts`), `import type { PackedBar } from './types'
 
-const OHLC_BY_TICKER: Record<string, { start: number; bars: PackedBar[]; dates?: string[] }> = {
-${packed.map(({ ticker, bars, start, contiguous }) =>
+// Chunk ${c}/${CHUNK_COUNT} of the sharded real OHLC data — see manifest.ts.
+export const OHLC: Record<string, { start: number; bars: PackedBar[]; dates?: string[] }> = {
+${entries.map(({ ticker, bars, start, contiguous }) =>
   `  ${JSON.stringify(ticker)}: { start: ${contiguous ? start : 0}, bars: [${bars.map(b => `[${b.open},${b.high},${b.low},${b.close}]`).join(',')}]${contiguous ? '' : `, dates: [${bars.map(b => JSON.stringify(b.time)).join(',')}]`} },`
 ).join('\n')}
 }
+`)
+}
 
-export function getRealBars(ticker: string): OhlcBar[] | undefined {
-  const entry = OHLC_BY_TICKER[ticker]
+writeFileSync(join(ohlcDir, 'types.ts'), `export type PackedBar = [number, number, number, number]\n`)
+
+const chunkImports = Array.from({ length: CHUNK_COUNT }, (_, c) => `  ${c}: () => import('./chunk${c}'),`).join('\n')
+writeFileSync(join(ohlcDir, 'index.ts'), `import type { OhlcBar } from '../../utils/ohlc'
+import { DATES, CHUNK_OF } from './manifest'
+import type { PackedBar } from './types'
+
+// Real OHLC data is sharded across ${CHUNK_COUNT} chunk files (see manifest.ts
+// for which ticker lives in which chunk) so a detail page's dynamic import
+// only pulls in the ~1/${CHUNK_COUNT} of tickers it might actually need.
+const loaders: Record<number, () => Promise<{ OHLC: Record<string, { start: number; bars: PackedBar[]; dates?: string[] }> }>> = {
+${chunkImports}
+}
+
+export async function getRealBars(ticker: string): Promise<OhlcBar[] | undefined> {
+  const chunkId = CHUNK_OF[ticker]
+  if (chunkId === undefined) return undefined
+  const { OHLC } = await loaders[chunkId]()
+  const entry = OHLC[ticker]
   if (!entry) return undefined
   return entry.bars.map((b, i) => ({
     time: entry.dates ? entry.dates[i] : DATES[entry.start + i],
     open: b[0], high: b[1], low: b[2], close: b[3],
   }))
 }
-`
-writeFileSync(join(ROOT, 'src/data/ohlcHistory.ts'), ohlcTs)
+`)
 
-console.error(`\nWrote ${rows.length} stocks (snapshot ${snapshotDate}).`)
+console.error(`\nDone. Snapshot date ${snapshotDate}. ${chartResults.size}/${ALL_TICKERS.length} tickers have real charts.`)

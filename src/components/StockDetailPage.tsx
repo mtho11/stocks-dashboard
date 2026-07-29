@@ -88,9 +88,9 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     let cancelled = false
     const synthetic = () => generateOhlcHistory(stock.ticker, stock.price, stock.pct1Y, new Date())
     import('../data/ohlcHistory')
-      .then(m => {
+      .then(m => m.getRealBars(stock.ticker))
+      .then(real => {
         if (cancelled) return
-        const real = m.getRealBars(stock.ticker)
         setBarsState({ ticker: stock.ticker, bars: real ?? synthetic(), real: !!real })
       })
       .catch(() => {
