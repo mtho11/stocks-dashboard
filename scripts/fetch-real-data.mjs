@@ -181,6 +181,7 @@ function buildRealRow(ticker, sector) {
     ps: null,
     pe: quote.trailingPE != null ? round2(quote.trailingPE) : null,
     pctYTD: round2(pctYTD(bars) ?? 0),
+    pct1D: round2(pctOver(closes, 1) ?? 0),
     pct1Y: round2(pctOver(closes, 252) ?? 0),
     deltaHighs: round2(((price - high52) / high52) * 100),
     ret1W: round1(pctOver(closes, 5) ?? 0),
@@ -203,8 +204,14 @@ function withRsRank(rows) {
   }))
 }
 
+// Fallback (mock) rows predate the % 1D column, so approximate a daily
+// figure from the weekly one rather than leaving it at zero.
+function withPct1D(row) {
+  return row.pct1D !== undefined ? row : { ...row, pct1D: round1(row.ret1W / 5) }
+}
+
 function stockRowLiteral(r) {
-  return `  { ticker: ${JSON.stringify(r.ticker)}, company: ${JSON.stringify(r.company)}, sector: ${JSON.stringify(r.sector)}, price: ${r.price}, marketCap: ${JSON.stringify(r.marketCap)}, ps: ${r.ps === null ? 'null' : r.ps}, pe: ${r.pe === null ? 'null' : r.pe}, pctYTD: ${r.pctYTD}, pct1Y: ${r.pct1Y}, deltaHighs: ${r.deltaHighs}, rsRank: ${r.rsRank}, ret1W: ${r.ret1W}, ret1M: ${r.ret1M}, ret3M: ${r.ret3M}, ret6M: ${r.ret6M}, sma20: '${r.sma20}', sma50: '${r.sma50}', sma200: '${r.sma200}', sparklineData: [${r.sparklineData.join(',')}] },`
+  return `  { ticker: ${JSON.stringify(r.ticker)}, company: ${JSON.stringify(r.company)}, sector: ${JSON.stringify(r.sector)}, price: ${r.price}, marketCap: ${JSON.stringify(r.marketCap)}, ps: ${r.ps === null ? 'null' : r.ps}, pe: ${r.pe === null ? 'null' : r.pe}, pctYTD: ${r.pctYTD}, pct1D: ${r.pct1D}, pct1Y: ${r.pct1Y}, deltaHighs: ${r.deltaHighs}, rsRank: ${r.rsRank}, ret1W: ${r.ret1W}, ret1M: ${r.ret1M}, ret3M: ${r.ret3M}, ret6M: ${r.ret6M}, sma20: '${r.sma20}', sma50: '${r.sma50}', sma200: '${r.sma200}', sparklineData: [${r.sparklineData.join(',')}] },`
 }
 
 // ── stocks.ts (AI Cake) ─────────────────────────────────────────────────
@@ -246,7 +253,7 @@ for (const name of LIST_FILES) {
     const real = buildRealRow(orig.ticker, orig.sector)
     if (real) return real
     fallbackTickers.push(orig.ticker)
-    return orig
+    return withPct1D(orig)
   }))
 
   const fallbackNote = fallbackTickers.length

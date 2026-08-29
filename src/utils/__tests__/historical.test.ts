@@ -12,6 +12,7 @@ function makeStock(overrides: Partial<Stock> = {}): Stock {
     ps: 5,
     pe: 20,
     pctYTD: 40,
+    pct1D: 0.5,
     pct1Y: 80,
     deltaHighs: -5,
     rsRank: 90,

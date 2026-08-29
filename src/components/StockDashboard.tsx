@@ -107,7 +107,7 @@ function formatDisplayDate(iso: string) {
   return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`
 }
 
-type StockSortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
+type StockSortKey = keyof Pick<Stock, 'ticker' | 'company' | 'sector' | 'price' | 'pctYTD' | 'pct1D' | 'pct1Y' | 'marketCap' | 'rsRank' | 'deltaHighs' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'>
 type SortKey = StockSortKey | 'favorite'
 type SortDir = 'asc' | 'desc'
 
@@ -118,7 +118,7 @@ function getSortValue(s: Stock, key: SortKey, favorites: Set<string>): number | 
 }
 
 // ── Custom column filters ────────────────────────────────────────────────
-type RangeFilterKey = 'price' | 'marketCap' | 'pctYTD' | 'pct1Y' | 'deltaHighs' | 'rsRank' | 'rsi' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'
+type RangeFilterKey = 'price' | 'marketCap' | 'pctYTD' | 'pct1D' | 'pct1Y' | 'deltaHighs' | 'rsRank' | 'rsi' | 'ret1W' | 'ret1M' | 'ret3M' | 'ret6M'
 type RangeValue = { min: string; max: string }
 type SmaFilterValue = 'any' | 'up' | 'down'
 
@@ -132,6 +132,7 @@ const RANGE_FILTER_DEFS: RangeFilterDef[] = [
   { key: 'price', label: 'Price ($)', getValue: s => s.price },
   { key: 'marketCap', label: 'Mkt Cap ($B)', getValue: s => parseMarketCap(s.marketCap) / 1e9 },
   { key: 'pctYTD', label: '% YTD', getValue: s => s.pctYTD },
+  { key: 'pct1D', label: '% 1D', getValue: s => s.pct1D },
   { key: 'pct1Y', label: '% 1Y', getValue: s => s.pct1Y },
   { key: 'deltaHighs', label: 'Δ Highs (%)', getValue: s => s.deltaHighs },
   { key: 'rsRank', label: 'RS Rank', getValue: s => s.rsRank },
@@ -1047,6 +1048,7 @@ export function StockDashboard() {
               <Th label="Mkt Cap" sk="marketCap" right tip="Total market capitalization — share price × shares outstanding." {...thProps} />
               <Th label="P/E" right tip="Price-to-earnings ratio — share price divided by earnings per share." {...thProps} />
               <Th label="% YTD" sk="pctYTD" tip="Percent price change since the start of the calendar year." {...thProps} />
+              <Th label="% 1D" sk="pct1D" tip="Percent price change over the most recent trading day." {...thProps} />
               <Th label="% 1Y" sk="pct1Y" tip="Percent price change over the trailing 12 months." {...thProps} />
               <Th label="Chart 1W" tip="7-day price sparkline." {...thProps} />
               <Th label="Chart 1M" tip="30-day price sparkline." {...thProps} />
@@ -1184,6 +1186,18 @@ export function StockDashboard() {
                     </div>
                   </td>
 
+                  {/* % 1D */}
+                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <span style={{
+                      color: ink(pctColor(s.pct1D)),
+                      background: pctBg(s.pct1D, isDark),
+                      padding: '2px 6px', borderRadius: 4,
+                      fontWeight: 600,
+                    }}>
+                      {fmtPct(s.pct1D)}
+                    </span>
+                  </td>
+
                   {/* % 1Y */}
                   <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
@@ -1283,7 +1297,7 @@ export function StockDashboard() {
                 {totalMktCap}
               </td>
               <td colSpan={1} />
-              <td colSpan={15} />
+              <td colSpan={16} />
             </tr>
           </tfoot>
         </table>

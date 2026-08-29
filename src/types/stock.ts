@@ -7,6 +7,7 @@ export interface Stock {
   ps: number | null
   pe: number | null
   pctYTD: number
+  pct1D: number
   pct1Y: number
   deltaHighs: number
   rsRank: number

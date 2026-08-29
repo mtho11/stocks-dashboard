@@ -17,7 +17,24 @@
       "Bash(npx vercel@33 deploy --prod --yes)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git rm *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(GIT_TRACE=1 git push -u origin main)",
+      "Bash(gh run *)",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "Bash(npm audit *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(k, '->', v['severity'], '|', v.get\\('via'\\)\\) for k,v in d['vulnerabilities'].items\\(\\)]\")",
+      "Bash(npm ls *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('vite:', d.get\\('devDependencies',{}\\).get\\('vite'\\)\\); print\\('plugin-react:', d.get\\('devDependencies',{}\\).get\\('@vitejs/plugin-react'\\)\\)\")",
+      "Bash(npm view *)",
+      "Bash(python3 -c \"import json,sys; v=json.load\\(sys.stdin\\); print\\([x for x in v if x.startswith\\('6.'\\)][-15:]\\)\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('package-lock.json'\\)\\); print\\('root vite:', d['packages']['node_modules/vite']['version']\\); print\\('esbuild:', d['packages'].get\\('node_modules/esbuild',{}\\).get\\('version'\\)\\)\")",
+      "Bash(npm ci *)",
+      "Bash(gh api *)"
     ]
   }
 }
