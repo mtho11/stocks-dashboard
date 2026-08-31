@@ -107,9 +107,25 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   const EMPTY_BARS: OhlcBar[] = useMemo(() => [], [])
   const bars = stock && barsState?.ticker === stock.ticker ? barsState.bars : EMPTY_BARS
   const isRealData = stock && barsState?.ticker === stock.ticker ? barsState.real : false
+  const chartBars = useMemo(() => {
+    if (!stock || !quoteUpdatedAt || bars.length === 0) return bars
+    const quote = liveQuotes[stock.ticker]
+    if (quote?.open === undefined || quote.high === undefined || quote.low === undefined || quote.price === undefined) return bars
+
+    const currentTime = new Date(quoteUpdatedAt).toISOString().slice(0, 10)
+    const currentBar: OhlcBar = {
+      time: currentTime,
+      open: quote.open,
+      high: quote.high,
+      low: quote.low,
+      close: quote.price,
+    }
+    const last = bars[bars.length - 1]
+    return last.time === currentTime ? [...bars.slice(0, -1), currentBar] : [...bars, currentBar]
+  }, [bars, liveQuotes, quoteUpdatedAt, stock])
   const earningsDates = useMemo(
-    () => stock ? generateEarningsDates(stock.ticker, bars) : [],
-    [stock, bars]
+    () => stock ? generateEarningsDates(stock.ticker, chartBars) : [],
+    [stock, chartBars]
   )
   const nextEarningsDate = useMemo(
     () => stock ? estimateNextEarningsDate(stock.ticker, earningsDates) : undefined,
@@ -119,8 +135,8 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   // type); YTD/1Y reuse the stock's own fields so they match the number
   // already shown elsewhere on this page and in the dashboard table.
   const priceChanges = useMemo(() => {
-    if (!stock || bars.length === 0) return undefined
-    const closes = bars.map(b => b.close)
+    if (!stock || chartBars.length === 0) return undefined
+    const closes = chartBars.map(b => b.close)
     const last = closes[closes.length - 1]
     const changeOverTradingDays = (n: number): number | undefined => {
       const i = closes.length - 1 - n
@@ -135,7 +151,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       y: stock.pct1Y,
       y2: changeOverTradingDays(TRADING_DAYS_PER_YEAR * 2),
     }
-  }, [stock, bars])
+  }, [stock, chartBars])
 
   const [range, setRange] = useState<RangeLabel>(parseRangeFromUrl)
   // Mirrors `range` for the chart-mount effect below (which only wants the
@@ -170,10 +186,10 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   }
 
   useEffect(() => {
-    if (!stock || !chartContainerRef.current || bars.length === 0) return
+    if (!stock || !chartContainerRef.current || chartBars.length === 0) return
 
-    barCountRef.current = bars.length
-    const closes = bars.map(b => b.close)
+    barCountRef.current = chartBars.length
+    const closes = chartBars.map(b => b.close)
     const ma50 = sma(closes, 50)
     const ma200 = sma(closes, 200)
     const boll = bollingerBands(closes, BOLL_PERIOD, BOLL_STDDEV)
@@ -204,7 +220,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       borderUpColor: '#48bb78', borderDownColor: '#e53e3e',
       wickUpColor: '#48bb78', wickDownColor: '#e53e3e',
     }, 0)
-    candleSeries.setData(bars)
+    candleSeries.setData(chartBars)
 
     createSeriesMarkers(candleSeries, earningsDates.map(time => ({
       time,
@@ -223,7 +239,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
         crosshairMarkerVisible: false,
       }, 0)
       series.setData(
-        bars
+        chartBars
           .map((b, i) => ({ time: b.time, value: values[i] }))
           .filter((d): d is { time: string; value: number } => d.value !== undefined)
       )
@@ -243,7 +259,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       lastValueVisible: true,
     }, 1)
     rsiSeries.setData(
-      bars
+        chartBars
         .map((b, i) => ({ time: b.time, value: rsi10[i] }))
         .filter((d): d is { time: string; value: number } => d.value !== undefined)
     )
@@ -259,8 +275,8 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     // instance directly via applyRange() rather than re-running this effect.
     const currentOpt = RANGE_OPTIONS.find(o => o.label === rangeRef.current) ?? RANGE_OPTIONS[3]
     chart.timeScale().setVisibleLogicalRange({
-      from: Math.max(0, bars.length - currentOpt.days),
-      to: bars.length - 1 + 2,
+      from: Math.max(0, chartBars.length - currentOpt.days),
+      to: chartBars.length - 1 + 2,
     })
 
     return () => {
@@ -268,7 +284,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
       chartRef.current = null
       void ma50Series; void ma200Series; void bollUpperSeries; void bollBasisSeries; void bollLowerSeries
     }
-  }, [stock, isDark, t, bars, earningsDates])
+  }, [stock, isDark, t, chartBars, earningsDates])
 
   if (!stock) {
     return (

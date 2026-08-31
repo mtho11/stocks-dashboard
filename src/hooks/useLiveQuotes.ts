@@ -12,6 +12,9 @@ const REFRESH_MS = 90_000
 export interface LiveQuote {
   price?: number
   pct1D?: number
+  open?: number
+  high?: number
+  low?: number
   marketCap?: number
   pe?: number
   high52?: number
@@ -38,7 +41,7 @@ interface LiveQuotesState {
 }
 
 const QUOTE_COLUMNS = [
-  'name', 'close', 'change', 'market_cap_basic', 'price_earnings_ttm',
+  'name', 'close', 'change', 'open', 'high', 'low', 'market_cap_basic', 'price_earnings_ttm',
   'price_52_week_high', 'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M',
   'Perf.Y', 'Perf.YTD', 'RSI', 'SMA20', 'SMA50', 'SMA200',
 ] as const
@@ -86,19 +89,22 @@ async function fetchBatch(tickers: string[]): Promise<LiveQuoteMap> {
     quotes[ticker] = {
       price: asNumber(values[1]),
       pct1D: asNumber(values[2]),
-      marketCap: asNumber(values[3]),
-      pe: asNumber(values[4]),
-      high52: asNumber(values[5]),
-      ret1W: asNumber(values[6]),
-      ret1M: asNumber(values[7]),
-      ret3M: asNumber(values[8]),
-      ret6M: asNumber(values[9]),
-      pct1Y: asNumber(values[10]),
-      pctYTD: asNumber(values[11]),
-      rsi14: asNumber(values[12]),
-      sma20: asNumber(values[13]),
-      sma50: asNumber(values[14]),
-      sma200: asNumber(values[15]),
+      open: asNumber(values[3]),
+      high: asNumber(values[4]),
+      low: asNumber(values[5]),
+      marketCap: asNumber(values[6]),
+      pe: asNumber(values[7]),
+      high52: asNumber(values[8]),
+      ret1W: asNumber(values[9]),
+      ret1M: asNumber(values[10]),
+      ret3M: asNumber(values[11]),
+      ret6M: asNumber(values[12]),
+      pct1Y: asNumber(values[13]),
+      pctYTD: asNumber(values[14]),
+      rsi14: asNumber(values[15]),
+      sma20: asNumber(values[16]),
+      sma50: asNumber(values[17]),
+      sma200: asNumber(values[18]),
       updatedAt,
     }
   }
