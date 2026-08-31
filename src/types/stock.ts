@@ -15,6 +15,7 @@ export interface Stock {
   ret1M: number
   ret3M: number
   ret6M: number
+  rsi14?: number
   sma20: 'up' | 'down'
   sma50: 'up' | 'down'
   sma200: 'up' | 'down'

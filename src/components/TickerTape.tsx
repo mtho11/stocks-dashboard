@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import type { Stock } from '../types/stock'
 import { navigateTo } from '../utils/nav'
-import { estimateDailyChangePct } from '../utils/ohlc'
 import type { Theme } from '../utils/theme'
 
 const BASE_PATH = import.meta.env.BASE_URL
@@ -11,13 +10,11 @@ function fmt(n: number, decimals = 2): string {
 }
 
 export function TickerTape({ stocks, t }: { stocks: Stock[]; t: Theme }) {
-  // Same 1D calibration the detail page's chart uses (seeded by ticker +
-  // today's date, ending exactly at the stock's real price), so a ticker
-  // shown here moving e.g. +6% matches what its own detail page reports.
+  // `pct1D` is refreshed in batches with the table quote data, so the tape
+  // and the % 1D dashboard column always agree.
   const movers = useMemo(() => {
-    const today = new Date()
     return stocks
-      .map(s => ({ stock: s, change: estimateDailyChangePct(s.ticker, s.price, s.pct1Y, today) }))
+      .map(stock => ({ stock, change: stock.pct1D }))
       .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
   }, [stocks])
 

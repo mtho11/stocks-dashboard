@@ -17,6 +17,7 @@ import { computeRSI14 } from '../utils/rsi'
 import { parseUrlState, buildUrlPath } from '../utils/urlState'
 import { navigateTo } from '../utils/nav'
 import { THEMES, THEME_KEY, getInitialTheme, darken, type ThemeMode, type Theme } from '../utils/theme'
+import { mergeLiveQuotes, useLiveQuotes } from '../hooks/useLiveQuotes'
 
 type StockListId = 'ai-cake' | 'nasdaq100' | 'dji' | 'finance' | 'oil' | 'healthcare' | 'biotech' | 'retail' | 'ia12'
 const STOCK_LIST_IDS: StockListId[] = ['ai-cake', 'nasdaq100', 'dji', 'finance', 'oil', 'healthcare', 'biotech', 'retail', 'ia12']
@@ -509,7 +510,12 @@ export function StockDashboard() {
   const ink = useCallback((hex: string) => (isDark ? hex : darken(hex)), [isDark])
 
   const activeList = useMemo(() => resolveActiveList(stockListId, customLists), [stockListId, customLists])
-  const sourceStocks = activeList.stocks
+  const { quotes: liveQuotes, updatedAt: quotesUpdatedAt, isRefreshing: quotesRefreshing, error: quoteError } = useLiveQuotes(ALL_TICKERS)
+  const sourceStocks = useMemo(
+    () => mergeLiveQuotes(activeList.stocks, liveQuotes),
+    [activeList.stocks, liveQuotes]
+  )
+  const liveNasdaq100 = useMemo(() => mergeLiveQuotes(nasdaq100, liveQuotes), [liveQuotes])
   const activeCustomList = customLists.find(l => l.id === stockListId)
 
   useEffect(() => {
@@ -591,7 +597,7 @@ export function StockDashboard() {
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
       {/* Ticker tape — bleeds to the full page width despite the padding above */}
       <div style={{ margin: '-24px -16px 20px' }}>
-        <TickerTape stocks={nasdaq100} t={t} />
+        <TickerTape stocks={liveNasdaq100} t={t} />
       </div>
 
       {/* Header */}
@@ -640,7 +646,10 @@ export function StockDashboard() {
           {activeList.title}
         </h1>
         <p style={{ color: t.textMuted, fontSize: 13 }}>
-          by @mtho11 · {formatDisplayDate(SNAPSHOT_DATE)}
+          by @mtho11 · chart snapshot {formatDisplayDate(SNAPSHOT_DATE)} ·{' '}
+          <span style={{ color: quoteError ? '#e53e3e' : quotesUpdatedAt ? '#48bb78' : t.textMuted, fontWeight: 700 }}>
+            {quoteError ? 'QUOTE FEED UNAVAILABLE' : quotesUpdatedAt ? `LIVE QUOTES${quotesRefreshing ? ' · REFRESHING' : ''}` : 'LOADING LIVE QUOTES'}
+          </span>
         </p>
       </div>
 

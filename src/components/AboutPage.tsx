@@ -163,9 +163,10 @@ export function AboutPage() {
             background: 'rgba(246,173,85,0.1)', border: '1px solid #744210', borderRadius: 8,
             padding: '10px 14px', color: '#dd6b20', fontSize: 13, lineHeight: 1.6,
           }}>
-            ⚠️ <strong>Real market data</strong>, captured as a one-time snapshot — it is not a live
-            feed and does not update on its own. A handful of tickers without a usable real quote
-            (e.g. SPCX, which isn't publicly traded) fall back to a hand-authored mock estimate.
+            ⚠️ <strong>Live quotes refresh about every 90 seconds</strong> in batched requests while you
+            use the dashboard. Price, market cap, P/E, performance, RSI, and moving-average status
+            use that live feed; historical candles remain a build-time snapshot. Tickers without a
+            usable quote (e.g. SPCX, which isn't publicly traded) retain their saved estimate.
             Nothing here is investment advice.
           </div>
         </section>

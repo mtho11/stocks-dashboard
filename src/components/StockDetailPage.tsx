@@ -13,6 +13,7 @@ import { sma, bollingerBands, rsi } from '../utils/indicators'
 import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/theme'
 import { navigateTo } from '../utils/nav'
 import { downloadIcsEvent } from '../utils/ics'
+import { mergeLiveQuotes, useLiveQuotes } from '../hooks/useLiveQuotes'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
@@ -65,7 +66,12 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   const isDark = mode === 'dark'
   const t = THEMES[mode]
 
-  const stock = ALL_STOCKS_BY_TICKER[ticker.toUpperCase()]
+  const snapshotStock = ALL_STOCKS_BY_TICKER[ticker.toUpperCase()]
+  const { quotes: liveQuotes, updatedAt: quoteUpdatedAt } = useLiveQuotes(snapshotStock ? [snapshotStock.ticker] : [])
+  const stock = useMemo(
+    () => snapshotStock ? mergeLiveQuotes([snapshotStock], liveQuotes)[0] : undefined,
+    [snapshotStock, liveQuotes]
+  )
 
   useEffect(() => {
     window.localStorage.setItem(THEME_KEY, mode)
@@ -77,10 +83,9 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     document.title = stock ? `${stock.ticker} — ${stock.company}` : 'Stock not found'
   }, [stock])
 
-  // Real daily OHLC lives in a ~1MB generated module, so it's loaded on
-  // demand rather than bundled into the initial payload. Tickers without a
-  // real snapshot (the lists still on mock data) fall back to the seeded
-  // synthetic generator.
+  // Real daily OHLC lives in a generated module, so it is loaded on demand
+  // rather than bundled into the initial payload. A few unavailable symbols
+  // fall back to the seeded synthetic generator.
   const [barsState, setBarsState] = useState<{ ticker: string; bars: OhlcBar[]; real: boolean } | undefined>()
 
   useEffect(() => {
@@ -428,8 +433,8 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
 
         <p style={{ color: t.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
           {isRealData
-            ? 'Real daily market data — a snapshot, not a live feed, so it does not update on its own.'
-            : "Chart data is synthetic — calibrated to this app's mock price and 1Y return, not real market history."}
+            ? `Live quote${quoteUpdatedAt ? ' displayed above' : ' loading'}; daily chart history is a build-time market-data snapshot.`
+            : "Live quote loading; chart history is synthetic for this ticker because real history is unavailable."}
         </p>
       </div>
     </div>
