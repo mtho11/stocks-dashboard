@@ -14,6 +14,7 @@ import { THEMES, THEME_KEY, getInitialTheme, type ThemeMode } from '../utils/the
 import { navigateTo } from '../utils/nav'
 import { downloadIcsEvent } from '../utils/ics'
 import { mergeLiveQuotes, useLiveQuotes } from '../hooks/useLiveQuotes'
+import { useStockNews } from '../hooks/useStockNews'
 
 const BASE_PATH = import.meta.env.BASE_URL
 
@@ -72,6 +73,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
     () => snapshotStock ? mergeLiveQuotes([snapshotStock], liveQuotes)[0] : undefined,
     [snapshotStock, liveQuotes]
   )
+  const { items: newsItems, loading: newsLoading, error: newsError, refresh: refreshNews, searchUrl: newsSearchUrl } = useStockNews(stock?.ticker ?? ticker.toUpperCase())
 
   useEffect(() => {
     window.localStorage.setItem(THEME_KEY, mode)
@@ -465,6 +467,69 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
             ? `Live quote${quoteUpdatedAt ? ' displayed above' : ' loading'}; daily chart history is a build-time market-data snapshot.`
             : "Live quote loading; chart history is synthetic for this ticker because real history is unavailable."}
         </p>
+
+        {/* Latest headlines */}
+        <section style={{ marginTop: 24 }} aria-labelledby="latest-news-heading">
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+            <h2 id="latest-news-heading" style={{ margin: 0, color: t.textPrimary, fontSize: 16, fontWeight: 800 }}>
+              Latest {stock.ticker} news
+            </h2>
+            <a
+              href={newsSearchUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: t.textSecondary, fontSize: 11, textDecoration: 'none' }}
+            >
+              Open Google News ↗
+            </a>
+          </div>
+          <div style={{
+            background: t.panelBg, border: `1px solid ${t.borderOuter}`, borderRadius: 12,
+            overflow: 'hidden',
+          }}>
+            {newsLoading && (
+              <div style={{ padding: '18px 16px', color: t.textMuted, fontSize: 12 }}>
+                Loading the latest headlines…
+              </div>
+            )}
+            {!newsLoading && newsError && (
+              <div style={{ padding: '18px 16px', color: t.textSecondary, fontSize: 12 }}>
+                Headlines are temporarily unavailable.{' '}
+                <button
+                  onClick={refreshNews}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#4299e1', cursor: 'pointer', font: 'inherit' }}
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+            {!newsLoading && !newsError && newsItems.length === 0 && (
+              <div style={{ padding: '18px 16px', color: t.textMuted, fontSize: 12 }}>
+                No recent headlines were returned for this ticker.
+              </div>
+            )}
+            {!newsLoading && !newsError && newsItems.map((item, index) => (
+              <a
+                key={`${item.link}-${index}`}
+                href={item.link}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'baseline', gap: 10,
+                  padding: '11px 14px', textDecoration: 'none',
+                  borderBottom: index < newsItems.length - 1 ? `1px solid ${t.borderInner}` : 'none',
+                }}
+              >
+                <span style={{ color: t.textMuted, fontSize: 11, minWidth: 18, textAlign: 'right' }}>{index + 1}</span>
+                <span style={{ flex: 1, color: t.textPrimary, fontSize: 12.5, lineHeight: 1.4 }}>{item.title}</span>
+                <span style={{ color: t.textMuted, fontSize: 10.5, whiteSpace: 'nowrap' }}>{item.pubDate ?? ''}</span>
+              </a>
+            ))}
+          </div>
+          <p style={{ color: t.textMuted, fontSize: 10.5, margin: '8px 2px 0' }}>
+            Headlines and links provided through Google News RSS.
+          </p>
+        </section>
       </div>
     </div>
   )
