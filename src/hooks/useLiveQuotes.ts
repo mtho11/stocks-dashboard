@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Stock } from '../types/stock'
 import { fmtMarketCap } from '../utils/marketCap'
 
@@ -7,7 +7,7 @@ import { fmtMarketCap } from '../utils/marketCap'
 // only a few calls instead of firing one request per table row.
 const QUOTE_ENDPOINT = 'https://scanner.tradingview.com/america/scan'
 const BATCH_SIZE = 75
-const REFRESH_MS = 90_000
+const REFRESH_MS = 15 * 60_000
 
 export interface LiveQuote {
   price?: number
@@ -38,6 +38,7 @@ interface LiveQuotesState {
   updatedAt?: number
   isRefreshing: boolean
   error?: string
+  refresh: () => void
 }
 
 const QUOTE_COLUMNS = [
@@ -111,9 +112,11 @@ async function fetchBatch(tickers: string[]): Promise<LiveQuoteMap> {
   return quotes
 }
 
-async function refreshQuotes(tickers: string[]): Promise<LiveQuoteMap> {
+async function refreshQuotes(tickers: string[], force = false): Promise<LiveQuoteMap> {
   const now = Date.now()
-  const due = tickers.filter(ticker => now - (fetchedAtByTicker.get(ticker) ?? 0) >= REFRESH_MS)
+  const due = force
+    ? tickers
+    : tickers.filter(ticker => now - (fetchedAtByTicker.get(ticker) ?? 0) >= REFRESH_MS)
   if (!due.length) return currentQuotes(tickers)
 
   const batches: string[][] = []
@@ -140,33 +143,34 @@ export function useLiveQuotes(tickers: string[]): LiveQuotesState {
   const normalizedTickers = useMemo(() => tickerKey ? tickerKey.split(',') : [], [tickerKey])
   const [state, setState] = useState<LiveQuotesState>(() => {
     const quotes = currentQuotes(normalizedTickers)
-    return { quotes, updatedAt: latestTimestamp(quotes), isRefreshing: normalizedTickers.length > 0 }
+    return { quotes, updatedAt: latestTimestamp(quotes), isRefreshing: normalizedTickers.length > 0, refresh: () => undefined }
   })
+
+  const runRefresh = useCallback((force: boolean) => {
+    if (!normalizedTickers.length) return
+    setState(prev => ({ ...prev, isRefreshing: true, error: undefined }))
+    void refreshQuotes(normalizedTickers, force)
+      .then(quotes => {
+        setState(prev => ({ ...prev, quotes, updatedAt: latestTimestamp(quotes), isRefreshing: false }))
+      })
+      .catch(() => {
+        const quotes = currentQuotes(normalizedTickers)
+        setState(prev => ({ ...prev, quotes, updatedAt: latestTimestamp(quotes), isRefreshing: false, error: 'Live quote refresh failed' }))
+      })
+  }, [normalizedTickers])
 
   useEffect(() => {
     if (!normalizedTickers.length) return
-    let cancelled = false
-    const refresh = () => {
-      void refreshQuotes(normalizedTickers)
-        .then(quotes => {
-          if (!cancelled) setState({ quotes, updatedAt: latestTimestamp(quotes), isRefreshing: false })
-        })
-        .catch(() => {
-          if (!cancelled) {
-            const quotes = currentQuotes(normalizedTickers)
-            setState({ quotes, updatedAt: latestTimestamp(quotes), isRefreshing: false, error: 'Live quotes temporarily unavailable' })
-          }
-        })
-    }
-    refresh()
-    const timer = window.setInterval(refresh, REFRESH_MS)
+    const initialRefresh = window.setTimeout(() => runRefresh(false), 0)
+    const timer = window.setInterval(() => runRefresh(false), REFRESH_MS)
     return () => {
-      cancelled = true
+      window.clearTimeout(initialRefresh)
       window.clearInterval(timer)
     }
-  }, [normalizedTickers])
+  }, [normalizedTickers, runRefresh])
 
-  return state
+  const refresh = useCallback(() => runRefresh(true), [runRefresh])
+  return { ...state, refresh }
 }
 
 export function mergeLiveQuotes(stocks: Stock[], quotes: LiveQuoteMap): Stock[] {

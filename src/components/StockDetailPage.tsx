@@ -67,7 +67,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   const t = THEMES[mode]
 
   const snapshotStock = ALL_STOCKS_BY_TICKER[ticker.toUpperCase()]
-  const { quotes: liveQuotes, updatedAt: quoteUpdatedAt } = useLiveQuotes(snapshotStock ? [snapshotStock.ticker] : [])
+  const { quotes: liveQuotes, updatedAt: quoteUpdatedAt, isRefreshing: quotesRefreshing, refresh: refreshLiveQuotes } = useLiveQuotes(snapshotStock ? [snapshotStock.ticker] : [])
   const stock = useMemo(
     () => snapshotStock ? mergeLiveQuotes([snapshotStock], liveQuotes)[0] : undefined,
     [snapshotStock, liveQuotes]
@@ -363,6 +363,19 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
                 P/E {stock.pe !== null ? fmt(stock.pe) : 'n/a'}
               </div>
             </div>
+            <button
+              onClick={refreshLiveQuotes}
+              disabled={quotesRefreshing}
+              aria-label="Refresh live quote"
+              style={{
+                padding: '6px 10px', borderRadius: 8, border: `1px solid ${t.borderControl}`,
+                background: t.inputBg, color: t.textSecondary,
+                cursor: quotesRefreshing ? 'default' : 'pointer', fontSize: 12, fontWeight: 600,
+                opacity: quotesRefreshing ? 0.65 : 1,
+              }}
+            >
+              ↻ {quotesRefreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
             <button
               onClick={() => setMode(m => m === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle light/dark theme"

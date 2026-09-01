@@ -510,7 +510,7 @@ export function StockDashboard() {
   const ink = useCallback((hex: string) => (isDark ? hex : darken(hex)), [isDark])
 
   const activeList = useMemo(() => resolveActiveList(stockListId, customLists), [stockListId, customLists])
-  const { quotes: liveQuotes, updatedAt: quotesUpdatedAt, isRefreshing: quotesRefreshing, error: quoteError } = useLiveQuotes(ALL_TICKERS)
+  const { quotes: liveQuotes, updatedAt: quotesUpdatedAt, isRefreshing: quotesRefreshing, error: quoteError, refresh: refreshLiveQuotes } = useLiveQuotes(ALL_TICKERS)
   const sourceStocks = useMemo(
     () => mergeLiveQuotes(activeList.stocks, liveQuotes),
     [activeList.stocks, liveQuotes]
@@ -703,6 +703,20 @@ export function StockDashboard() {
             </optgroup>
           )}
         </select>
+
+        <button
+          onClick={refreshLiveQuotes}
+          disabled={quotesRefreshing}
+          style={{
+            padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+            cursor: quotesRefreshing ? 'default' : 'pointer',
+            border: `1px solid ${t.borderControl}`,
+            background: t.inputBg, color: t.textSecondary,
+            opacity: quotesRefreshing ? 0.65 : 1,
+          }}
+        >
+          ↻ {quotesRefreshing ? 'Refreshing…' : 'Refresh quotes'}
+        </button>
 
         {/* Custom list manager */}
         <div style={{ position: 'relative' }}>
