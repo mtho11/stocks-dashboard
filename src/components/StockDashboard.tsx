@@ -413,7 +413,7 @@ function fmtPct(n: number): string {
 export function StockDashboard() {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme)
   const [stockListId, setStockListId] = useState<string>(readUrlListId)
-  const [sortKey, setSortKey] = useState<SortKey>('pctYTD')
+  const [sortKey, setSortKey] = useState<SortKey>('pct1D')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'positive' | 'negative'>('all')
