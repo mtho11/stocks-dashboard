@@ -227,7 +227,7 @@ function Th({ label, sk, right, tip, sortKey, sortDir, onSort, t, ink }: {
         textTransform: 'uppercase',
         userSelect: 'none',
         borderBottom: `1px solid ${t.borderControl}`,
-        background: t.panelBg,
+        background: active ? (t === THEMES.dark ? 'rgba(144,205,244,0.10)' : 'rgba(43,108,176,0.10)') : t.panelBg,
         position: 'sticky', top: 0, zIndex: 2,
       }}
     >
@@ -497,6 +497,7 @@ export function StockDashboard() {
 
   const isDark = mode === 'dark'
   const t = THEMES[mode]
+  const activeSortBg = isDark ? 'rgba(144,205,244,0.08)' : 'rgba(43,108,176,0.08)'
 
   useEffect(() => {
     window.localStorage.setItem(THEME_KEY, mode)
@@ -592,6 +593,7 @@ export function StockDashboard() {
   }, [baseStocks])
 
   const thProps = { sortKey, sortDir, onSort: toggleSort, t, ink }
+  const sortCell = (key: SortKey) => sortKey === key ? { background: activeSortBg } : {}
 
   return (
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px', transition: 'background 0.2s' }}>
@@ -1116,7 +1118,7 @@ export function StockDashboard() {
                   onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
                   {/* Favorite */}
-                  <td style={{ padding: '7px 4px', textAlign: 'center', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('favorite'), padding: '7px 4px', textAlign: 'center', borderBottom: cellBorder }}>
                     <button
                       onClick={() => toggleFavorite(s.ticker)}
                       aria-label={isFavorite ? `Remove ${s.ticker} from favorites` : `Add ${s.ticker} to favorites`}
@@ -1132,7 +1134,7 @@ export function StockDashboard() {
                   </td>
 
                   {/* Rank */}
-                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('ticker'), padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
                       fontWeight: i < 3 ? 700 : 500,
                       fontSize: 11.5,
@@ -1159,12 +1161,12 @@ export function StockDashboard() {
                   </td>
 
                   {/* Company */}
-                  <td style={{ padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
+                  <td style={{ ...sortCell('company'), padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
                     <span style={{ color: t.textSecondary, fontSize: 12 }}>{s.company}</span>
                   </td>
 
                   {/* Sector */}
-                  <td style={{ padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
+                  <td style={{ ...sortCell('sector'), padding: '7px 8px', borderBottom: cellBorder, whiteSpace: 'nowrap' }}>
                     <span style={{
                       fontSize: 11,
                       fontWeight: 500,
@@ -1176,14 +1178,14 @@ export function StockDashboard() {
                   </td>
 
                   {/* Price */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('price'), padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{ fontWeight: 600, color: t.textPrimary }}>
                       ${fmt(s.price)}
                     </span>
                   </td>
 
                   {/* Market Cap */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('marketCap'), padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{ color: t.textSecondary }}>{s.marketCap}</span>
                   </td>
 
@@ -1195,7 +1197,7 @@ export function StockDashboard() {
                   </td>
 
                   {/* % YTD */}
-                  <td style={{ padding: '7px 6px', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('pctYTD'), padding: '7px 6px', borderBottom: cellBorder }}>
                     <div style={{
                       display: 'inline-block',
                       background: ytdBg(s.pctYTD),
@@ -1210,7 +1212,7 @@ export function StockDashboard() {
                   </td>
 
                   {/* % 1D */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('pct1D'), padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
                       color: ink(pctColor(s.pct1D)),
                       background: pctBg(s.pct1D, isDark),
@@ -1222,7 +1224,7 @@ export function StockDashboard() {
                   </td>
 
                   {/* % 1Y */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('pct1Y'), padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{
                       color: ink(pctColor(s.pct1Y)),
                       background: pctBg(s.pct1Y, isDark),
@@ -1249,14 +1251,14 @@ export function StockDashboard() {
                   </td>
 
                   {/* Delta Highs */}
-                  <td style={{ padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('deltaHighs'), padding: '7px 8px', textAlign: 'right', borderBottom: cellBorder }}>
                     <span style={{ color: s.deltaHighs >= -5 ? '#38a169' : s.deltaHighs >= -15 ? '#dd6b20' : '#e53e3e', fontWeight: 600 }}>
                       {fmt(s.deltaHighs)}%
                     </span>
                   </td>
 
                   {/* RS Rank */}
-                  <td style={{ padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
+                  <td style={{ ...sortCell('rsRank'), padding: '7px 8px', textAlign: 'center', borderBottom: cellBorder }}>
                     <span style={{
                       display: 'inline-block',
                       background: s.rsRank >= 90 ? 'rgba(72,187,120,0.2)' : s.rsRank >= 70 ? 'rgba(246,173,85,0.15)' : 'rgba(252,129,129,0.15)',
@@ -1291,7 +1293,7 @@ export function StockDashboard() {
 
                   {/* Period returns */}
                   {(['ret1W', 'ret1M', 'ret3M', 'ret6M'] as const).map(k => (
-                    <td key={k} style={{ padding: '7px 6px', textAlign: 'right', borderBottom: cellBorder }}>
+                    <td key={k} style={{ ...sortCell(k), padding: '7px 6px', textAlign: 'right', borderBottom: cellBorder }}>
                       <span style={{
                         fontSize: 11.5, fontWeight: 600,
                         color: s[k] >= 0 ? '#38a169' : '#e53e3e',
