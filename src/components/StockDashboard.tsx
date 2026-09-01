@@ -650,7 +650,7 @@ export function StockDashboard() {
         <p style={{ color: t.textMuted, fontSize: 13 }}>
           by @mtho11 · chart snapshot {formatDisplayDate(SNAPSHOT_DATE)} ·{' '}
           <span style={{ color: quoteError ? '#e53e3e' : quotesUpdatedAt ? '#48bb78' : t.textMuted, fontWeight: 700 }}>
-            {quoteError ? 'QUOTE FEED UNAVAILABLE' : quotesUpdatedAt ? `LIVE QUOTES${quotesRefreshing ? ' · REFRESHING' : ''}` : 'LOADING LIVE QUOTES'}
+            {quoteError ? 'QUOTE FEED UNAVAILABLE' : quotesUpdatedAt ? `LIVE QUOTES${quotesRefreshing ? ' · REFRESHING' : ''} · ${__APP_COMMIT__}` : 'LOADING LIVE QUOTES'}
           </span>
         </p>
       </div>
