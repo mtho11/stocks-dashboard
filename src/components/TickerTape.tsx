@@ -41,13 +41,19 @@ export function TickerTape({ stocks, t }: { stocks: Stock[]; t: Theme }) {
         {items.map((m, i) => {
           const up = m.change >= 0
           return (
-            <button
+            <a
               key={i}
-              onClick={() => navigateTo(`${BASE_PATH}stock/${m.stock.ticker}`)}
+              href={`${BASE_PATH}stock/${m.stock.ticker}`}
+              onClick={event => {
+                event.preventDefault()
+                navigateTo(`${BASE_PATH}stock/${m.stock.ticker}`)
+              }}
+              aria-label={`Open ${m.stock.ticker} detail page`}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',
                 padding: '0 18px', fontSize: 12.5, whiteSpace: 'nowrap',
+                textDecoration: 'none',
               }}
             >
               <span style={{ fontWeight: 700, color: t.textPrimary }}>{m.stock.ticker}</span>
@@ -55,7 +61,7 @@ export function TickerTape({ stocks, t }: { stocks: Stock[]; t: Theme }) {
               <span style={{ color: up ? '#48bb78' : '#e53e3e', fontWeight: 700 }}>
                 {up ? '▲' : '▼'} {up ? '+' : ''}{fmt(m.change)}%
               </span>
-            </button>
+            </a>
           )
         })}
       </div>
