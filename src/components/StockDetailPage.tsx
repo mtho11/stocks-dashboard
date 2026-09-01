@@ -308,8 +308,8 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px clamp(16px, 3vw, 40px)' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div>
@@ -457,7 +457,7 @@ export function StockDetailPage({ ticker }: { ticker: string }) {
         {/* Chart */}
         <div style={{
           background: t.panelBg, border: `1px solid ${t.borderOuter}`, borderRadius: 12,
-          padding: 8, height: 560,
+          padding: 8, height: 'clamp(520px, 70vh, 760px)',
         }}>
           <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
         </div>

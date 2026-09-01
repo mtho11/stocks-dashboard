@@ -660,6 +660,22 @@ export function StockDashboard() {
         display: 'flex', gap: 12, marginBottom: 16,
         flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
       }}>
+        <button
+          onClick={refreshLiveQuotes}
+          disabled={quotesRefreshing}
+          aria-label="Refresh live quotes"
+          title="Refresh live quotes"
+          style={{
+            width: 34, height: 34, padding: 0, borderRadius: 8, fontSize: 17, fontWeight: 700,
+            cursor: quotesRefreshing ? 'default' : 'pointer',
+            border: `1px solid ${t.borderControl}`,
+            background: t.inputBg, color: t.textSecondary,
+            opacity: quotesRefreshing ? 0.65 : 1,
+          }}
+        >
+          ↻
+        </button>
+
         {/* List selector */}
         <select
           value={stockListId}
@@ -705,20 +721,6 @@ export function StockDashboard() {
             </optgroup>
           )}
         </select>
-
-        <button
-          onClick={refreshLiveQuotes}
-          disabled={quotesRefreshing}
-          style={{
-            padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-            cursor: quotesRefreshing ? 'default' : 'pointer',
-            border: `1px solid ${t.borderControl}`,
-            background: t.inputBg, color: t.textSecondary,
-            opacity: quotesRefreshing ? 0.65 : 1,
-          }}
-        >
-          ↻ {quotesRefreshing ? 'Refreshing…' : 'Refresh quotes'}
-        </button>
 
         {/* Custom list manager */}
         <div style={{ position: 'relative' }}>
