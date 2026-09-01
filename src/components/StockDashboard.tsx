@@ -1106,15 +1106,20 @@ export function StockDashboard() {
               const isPos1W = spark1W[spark1W.length - 1] >= spark1W[0]
               const isPos1M = spark1M[spark1M.length - 1] >= spark1M[0]
               const isPos1Y = s.sparklineData[s.sparklineData.length - 1] >= s.sparklineData[0]
-              const rowBg = i % 2 === 0 ? t.panelBg : t.panelBg2
-              const cellBorder = `1px solid ${t.borderInner}`
               const isFavorite = favorites.has(s.ticker)
+              const rowBg = isFavorite
+                ? (isDark ? 'rgba(246,173,85,0.10)' : 'rgba(198,120,30,0.10)')
+                : i % 2 === 0 ? t.panelBg : t.panelBg2
+              const rowHoverBg = isFavorite
+                ? (isDark ? 'rgba(246,173,85,0.16)' : 'rgba(198,120,30,0.16)')
+                : t.hoverBg
+              const cellBorder = `1px solid ${t.borderInner}`
               return (
                 <tr key={s.ticker} style={{
                   background: rowBg,
                   transition: 'background 0.1s',
                 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = t.hoverBg)}
+                  onMouseEnter={e => (e.currentTarget.style.background = rowHoverBg)}
                   onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                 >
                   {/* Favorite */}
